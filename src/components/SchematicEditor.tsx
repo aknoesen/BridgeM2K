@@ -62,6 +62,8 @@ export default function SchematicEditor() {
   const [simStatus, setSimStatus] = useState('')
   const [simBusy, setSimBusy] = useState(false)
   const engineRef = useRef<SpiceEngine | null>(null)
+  const [hoverGrid, setHoverGrid] = useState<{ gx: number; gy: number } | null>(null)
+  const [selectedWire, setSelectedWire] = useState<number | null>(null)
 
   const result = useMemo(() => toCircuit(sch, 'Schematic'), [sch])
 
@@ -108,6 +110,7 @@ export default function SchematicEditor() {
 
   function onBackgroundClick(e: React.MouseEvent) {
     const { gx, gy } = gridAt(e)
+    setSelectedWire(null)
     if (tool === 'select') { setSelected(null); return }
     if (tool === 'wire') {
       if (!wireStart) setWireStart({ x: gx, y: gy })
@@ -129,14 +132,22 @@ export default function SchematicEditor() {
   function onComponentDown(e: React.MouseEvent, id: string) {
     e.stopPropagation()
     setSelected(id) // clicking a placed part selects it in any tool (so R / Rotate act on it)
+    setSelectedWire(null)
     if (tool !== 'select') return
     const { gx, gy } = gridAt(e)
     const c = sch.components.find((x) => x.id === id)!
     setDrag({ id, ox: gx - c.gx, oy: gy - c.gy })
   }
+  function onWireClick(e: React.MouseEvent, i: number) {
+    e.stopPropagation()
+    if (tool === 'wire') return // don't select while drawing wires
+    setSelectedWire(i)
+    setSelected(null)
+  }
   function onMouseMove(e: React.MouseEvent) {
-    if (!drag) return
     const { gx, gy } = gridAt(e)
+    setHoverGrid({ gx, gy }) // live snap indicator for the wire tool
+    if (!drag) return
     setSch((s) => ({
       ...s,
       components: s.components.map((c) => c.id === drag.id ? { ...c, gx: Math.max(0, gx - drag.ox), gy: Math.max(0, gy - drag.oy) } : c),
@@ -145,6 +156,11 @@ export default function SchematicEditor() {
   function onMouseUp() { setDrag(null) }
 
   function deleteSelected() {
+    if (selectedWire !== null) {
+      setSch((s) => ({ ...s, wires: s.wires.filter((_, i) => i !== selectedWire) }))
+      setSelectedWire(null)
+      return
+    }
     if (!selected) return
     setSch((s) => ({ ...s, components: s.components.filter((c) => c.id !== selected) }))
     setSelected(null)
@@ -159,7 +175,7 @@ export default function SchematicEditor() {
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === 'INPUT') return // don't hijack value typing
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selected) deleteSelected()
+      if ((e.key === 'Delete' || e.key === 'Backspace') && (selected || selectedWire !== null)) deleteSelected()
       else if (e.key === 'r' || e.key === 'R') rotate()
     }
     window.addEventListener('keydown', h)
@@ -184,7 +200,7 @@ export default function SchematicEditor() {
           <div className="display-controls">
             <button className="run-btn active" onClick={simulate} disabled={simBusy}>{simBusy ? 'Simulating…' : '▶ Simulate'}</button>
             <button className="run-btn" onClick={rotate}>Rotate (R)</button>
-            <button className="run-btn" onClick={deleteSelected} disabled={!selected}>Delete</button>
+            <button className="run-btn" onClick={deleteSelected} disabled={!selected && selectedWire === null}>Delete</button>
             <button className="run-btn" onClick={() => { setSch({ components: [], wires: [] }); setSelected(null) }}>Clear</button>
           </div>
         </div>
@@ -204,15 +220,30 @@ export default function SchematicEditor() {
           </defs>
           <rect x={0} y={0} width="100%" height="100%" fill="url(#gridDots)" />
 
-          {/* wires */}
+          {/* wires (thin visible line + a fat transparent hit area for easy clicking) */}
           {sch.wires.map((w, i) => (
-            <line key={i} x1={px(w.x1)} y1={px(w.y1)} x2={px(w.x2)} y2={px(w.y2)}
-              stroke="var(--wire-color)" strokeWidth={2} />
+            <g key={i}>
+              <line x1={px(w.x1)} y1={px(w.y1)} x2={px(w.x2)} y2={px(w.y2)}
+                stroke={selectedWire === i ? 'var(--accent-blue)' : 'var(--wire-color)'}
+                strokeWidth={selectedWire === i ? 3 : 2} />
+              <line x1={px(w.x1)} y1={px(w.y1)} x2={px(w.x2)} y2={px(w.y2)}
+                stroke="transparent" strokeWidth={12} style={{ cursor: tool === 'wire' ? 'crosshair' : 'pointer' }}
+                onClick={(e) => onWireClick(e, i)} />
+            </g>
           ))}
 
-          {/* wire-in-progress hint */}
+          {/* wire-in-progress: start marker + rubber-band to the snapped cursor point */}
           {wireStart && (
             <circle cx={px(wireStart.x)} cy={px(wireStart.y)} r={4} fill="none" stroke="var(--accent-blue)" strokeWidth={2} />
+          )}
+          {tool === 'wire' && wireStart && hoverGrid && (
+            <line x1={px(wireStart.x)} y1={px(wireStart.y)} x2={px(hoverGrid.gx)} y2={px(hoverGrid.gy)}
+              stroke="var(--accent-blue)" strokeWidth={1} strokeDasharray="4 3" pointerEvents="none" />
+          )}
+          {/* live snap indicator: shows exactly which grid point the wire/part will land on */}
+          {tool === 'wire' && hoverGrid && (
+            <circle cx={px(hoverGrid.gx)} cy={px(hoverGrid.gy)} r={5} fill="none"
+              stroke="var(--accent-blue)" strokeWidth={1.5} pointerEvents="none" />
           )}
 
           {/* components */}
@@ -258,6 +289,8 @@ export default function SchematicEditor() {
               </div>
             )}
           </div>
+        ) : selectedWire !== null ? (
+          <div style={{ fontSize: 11, color: 'var(--accent-blue)' }}>Wire selected — press Delete to remove</div>
         ) : (
           <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Nothing selected</div>
         )}
