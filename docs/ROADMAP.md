@@ -16,7 +16,7 @@ Spec: `docs/specs/oscilloscope.md`
 
 | Phase | Title | Depends on | Status |
 |-------|-------|-----------|--------|
-| ARCH-1 | Channel bus in App.tsx (CH1/CH2 source abstraction) | — | TODO |
+| ARCH-1 | Channel bus in App.tsx (CH1/CH2 source abstraction) | — | DONE |
 | OSC-1 | Oscilloscope panel scaffold + timebase + CH1 trace | ARCH-1 | TODO |
 | OSC-2 | Second channel (CH2) + per-channel vertical controls | OSC-1 | TODO |
 | OSC-3 | Edge trigger engine (source/level/slope, auto/normal/single) | OSC-2 | TODO |
