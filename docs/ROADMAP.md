@@ -33,7 +33,8 @@ Spec: `docs/specs/schematic-ngspice.md`
 | SPICE-2 | Circuit graph model + netlist generator (`core/netlist.ts`) | SPICE-1 | TODO |
 | SCH-1 | Browser schematic editor MVP (place/wire R,C,L,V,opamp,gnd) | — | TODO |
 | SCH-2 | Bind editor → circuit graph → netlist | SCH-1, SPICE-2 | TODO |
-| LOOP-1 | Close the loop: generator → circuit → Spectrum/Scope; AC Bode | SCH-2, OSC-2 | TODO |
+| NET-1 | Network Analyzer instrument (Bode mag+phase, sine-sweep via ngspice `.ac`) | SPICE-2 | TODO |
+| LOOP-1 | Close the loop: generator → circuit → Network Analyzer (AC Bode) + Scope CH2 (transient) | SCH-2, OSC-2, NET-1 | TODO |
 | LOOP-2 | Live value tuning + transient/AC toggle + −3 dB cursor | LOOP-1 | TODO |
 | KICAD-1 | (Stretch) KiCad netlist import | LOOP-1 | TODO |
 
@@ -44,6 +45,23 @@ Notes:
 - ARCH-1 is small but unblocks the whole scope track; do it first.
 
 ---
+
+## Track C — Bench instruments (Power Supply, Voltmeter)
+
+Spec: `docs/specs/schematic-ngspice.md` (these instruments couple to the simulated circuit).
+
+| Phase | Title | Depends on | Status |
+|-------|-------|-----------|--------|
+| PSU-1 | Power Supply instrument — 2 rails (0..+5 V / 0..-5 V), tracking + independent | SPICE-2 | TODO |
+| DMM-1 | Voltmeter instrument — 2-channel AC/DC (±25 V), reads node V via `.op`/RMS | SPICE-2 | TODO |
+
+Notes:
+- These mirror real Scopy/M2K instruments (supplies 0..+5 V & 0..-5 V; voltmeter AC/DC ±25 V).
+- **SPICE-2 must lay the groundwork** (see its spec): the circuit graph models DC supply
+  rails so op-amps can be powered, and `buildNetlist` supports `.op`/`.dc` for the voltmeter.
+- PSU rails become DC sources powering active parts (op-amp); the Voltmeter reads a node.
+- Out of scope for now (digital, not needed for EEC1 analog labs): Logic Analyzer, Pattern
+  Generator, Digital IO. Revisit only if a course need appears.
 
 ## Recommended session sequence
 
@@ -59,9 +77,11 @@ A reasonable single-developer (single CC session per row) order:
 8. OSC-4 — trigger parity
 9. SCH-2 — editor → netlist
 10. OSC-5 — measurements/cursors
-11. LOOP-1 — close the loop + Bode
-12. LOOP-2 — live tuning
-13. KICAD-1 — stretch
+11. NET-1 — Network Analyzer instrument
+12. LOOP-1 — close the loop + Bode
+13. LOOP-2 — live tuning
+14. PSU-1 / DMM-1 — Power Supply + Voltmeter (after SPICE-2; slot when active circuits arrive)
+15. KICAD-1 — stretch
 
 Rationale: SPICE-1 is sequenced second on purpose. It carries the most technical risk
 (WASM under the GitHub Pages base path, Worker boundary). Proving it early means the
@@ -77,7 +97,7 @@ Two meaningful milestones to deploy:
 - **Scope MVP shippable** after OSC-3 (a working triggered two-channel scope is genuinely
   useful for Lab 3, even before holdoff/pulse parity). Deploy, then continue to OSC-4/5.
 - **Circuit-loop MVP shippable** after LOOP-1 (draw an RC filter, see the Bode curve in the
-  Spectrum Analyzer). This is the headline pedagogical payoff described in `CLAUDE.md`.
+  Network Analyzer). This is the headline pedagogical payoff described in `CLAUDE.md`.
 
 When a milestone deploys, note the deployed commit hash in `PROGRESS.md` and revisit the
 Lab 3 prelab `<!-- TWIN: -->` markers referenced in `CLAUDE.md`.

@@ -2,8 +2,8 @@
 
 Goal: close the loop described in `CLAUDE.md` — **Signal Generator output → circuit →
 Spectrum Analyzer / Oscilloscope input** — entirely in the browser, no hardware. A student
-draws an RC filter, sets the cutoff, and sees the Bode curve emerge in the Spectrum
-Analyzer; the same measurement they will later make on the bench.
+draws an RC filter, sets the cutoff, and sees the Bode curve emerge in the Network
+Analyzer instrument; the same measurement they will later make on the bench.
 
 Read `docs/CONVENTIONS.md` first. SPICE/netlist logic lives in `src/core/`, the editor UI in
 `src/components/SchematicEditor.tsx`.
@@ -22,7 +22,7 @@ Why this one:
 - Netlist input is **standard ngspice format**, so the schematic layer stays fully decoupled
   from the solver — exactly the architecture `CLAUDE.md` calls for.
 - Supports the analyses we need: **transient** (`.tran`) for time-domain into the scope and
-  **AC** (`.ac`) for the Bode plot into the Spectrum Analyzer.
+  **AC** (`.ac`) for the Bode plot in the Network Analyzer instrument.
 - It is itself a Vite/TypeScript project, so it fits this toolchain.
 
 Risk and mitigation:
@@ -107,6 +107,16 @@ of any UI.
 - Minimal op-amp model: an ideal/VCVS-based subcircuit is enough for EEC1 (inverting amp,
   INA-style front end). Do not require students to supply transistor models.
 
+- **Accommodate the bench instruments now (Track C) to avoid rework:**
+  - Represent **DC supply rails** in the circuit graph (e.g. a `dcSource` / rail component, or
+    reserved nets like `vcc`/`vee`) whose values are set by the Power Supply instrument
+    (PSU-1). The op-amp model takes power-rail nets so it can later be powered/clipped; the
+    simplest ideal VCVS may ignore them, but the nets must exist in the model.
+  - Make `buildNetlist` support an **`.op`** (operating-point) and/or **`.dc`** analysis in
+    addition to `.tran`/`.ac`, so the Voltmeter (DMM-1) can read a node's DC voltage. The
+    engine + `SimResult` already carry `'op'`/`'dc'` analysis kinds.
+  - Keep these as model capabilities only — no PSU/DMM UI in SPICE-2 (that is PSU-1/DMM-1).
+
 **Acceptance criteria:**
 - `buildNetlist` for a known RC low-pass produces a netlist that, fed to the SPICE-1 engine,
   yields the expected −3 dB point at `f = 1/(2πRC)` within tolerance. **Add a Vitest test**
@@ -169,6 +179,30 @@ only), docs.
 
 ---
 
+## Phase NET-1 — Network Analyzer instrument (Scopy parity)
+
+**Goal:** a dedicated Network Analyzer instrument that produces a Bode plot by sweeping the
+circuit, mirroring Scopy's Network Analyzer.
+
+**Implement:**
+- `src/components/NetworkAnalyzer.tsx` + nav entry + single/split layout integration.
+- Two stacked Plotly plots: magnitude (dB) and phase (deg) vs log-frequency x-axis.
+- Controls (component-local): start/stop frequency, points-per-decade, magnitude min/max,
+  phase min/max — defaults matching Scopy (mag -90..10 dB, phase -180..180 deg).
+- Drives an `.ac` sweep through `core/netlist.ts` + the SPICE engine; computes
+  `v(out)/v(in)` gain (dB) and phase (deg) from the complex `SimResult` columns (mag/phaseDeg
+  are already precomputed by `normalizeResult`).
+- Until SCH-2 provides a drawn circuit, NET-1 may sweep a hardcoded/default RC so the
+  instrument is testable on its own; LOOP-1 swaps in the editor's circuit.
+
+**Acceptance criteria:**
+- A default RC low-pass shows the correct -3 dB rolloff at 1/(2*pi*R*C) on the magnitude
+  plot and -45 deg at the cutoff on the phase plot (verify in PROGRESS).
+- Build clean; spectrum regression canary holds.
+
+**Files allowed:** `NetworkAnalyzer.tsx` (new), `App.tsx` (nav/layout), `core/netlist.ts`,
+`core/spice.ts` (call site), `index.css`/`Instrument.css` (styling), docs.
+
 ## Phase LOOP-1 — Close the loop (headline feature)
 
 **Goal:** generator → circuit → instruments. Draw a filter, see its Bode plot.
@@ -176,11 +210,14 @@ only), docs.
 **Implement:**
 - Wire the **Signal Generator** params into the circuit's input `V` source via the netlist
   mapping from SPICE-2.
-- **AC mode → Bode plot:** run an `.ac` sweep, take `v(out)/v(in)` magnitude (dB) and phase,
-  and render it. Reuse the Spectrum Analyzer's display conventions (dB y-axis, log frequency
-  x-axis) — either as a new mode in SpectrumAnalyzer or a dedicated Bode view. Decide and
-  document; prefer adding a "Circuit (Bode)" mode to the Spectrum Analyzer so students see
-  it in the same instrument they already know.
+- **AC mode → Bode plot in the Network Analyzer instrument.** DECISION (2026-06-26): to
+  mimic Scopy, the Bode plot is its OWN instrument — the **Network Analyzer** — NOT a mode of
+  the Spectrum Analyzer. In Scopy these are distinct: the Spectrum Analyzer is an FFT of a
+  captured signal; the Network Analyzer sweeps sine waves and plots transfer-function gain +
+  phase. Our ngspice `.ac` sweep is exactly a network-analyzer measurement. The Network
+  Analyzer instrument is built in phase **NET-1**; LOOP-1 wires the drawn circuit into it.
+  Render magnitude (dB) and phase (deg) vs log frequency, matching Scopy's Network Analyzer
+  (default mag range -90..10 dB, phase -180..180 deg, start/stop frequency controls).
 - **Transient mode → scope:** run `.tran`, and route `v(out)` to the Oscilloscope's **CH2**
   (`ChannelSource.kind = 'circuit-out'` from the channel bus). CH1 stays the generator input,
   so the student sees input vs output on one screen.
@@ -218,6 +255,47 @@ the Lab 3 `<!-- TWIN: -->` prelab markers in `CLAUDE.md`.
 
 **Files allowed:** `SchematicEditor.tsx`, `SpectrumAnalyzer.tsx`, `core/spice.ts`,
 `core/netlist.ts`, docs.
+
+---
+
+## Phase PSU-1 — Power Supply instrument (Scopy parity)
+
+**Goal:** a Power Supply instrument matching the M2K's two programmable rails.
+
+**Implement:**
+- `src/components/PowerSupply.tsx` + nav entry + layout integration.
+- Two rails: **V+ (0..+5 V)** and **V- (0..-5 V)**, each with numeric + slider control and an
+  enable toggle. **Tracking mode** (V- mirrors -V+) and **Independent mode**, matching Scopy.
+- The rail values feed the circuit's DC supply nets (the `dcSource`/rail model from SPICE-2),
+  so an op-amp drawn in the editor is powered from these rails.
+- App-level state (rails are shared, like generator params), not component-local, since the
+  circuit netlist consumes them.
+
+**Acceptance criteria:**
+- Setting V+ powers an op-amp circuit; output respects the rails (e.g. clips near them if the
+  model supports it). Tracking mode keeps V- = -V+. Verify in PROGRESS.
+- Build clean; spectrum regression canary holds.
+
+**Files allowed:** `PowerSupply.tsx` (new), `App.tsx`, `core/netlist.ts`, `index.css`/`Instrument.css`, docs.
+
+---
+
+## Phase DMM-1 — Voltmeter instrument (Scopy parity)
+
+**Goal:** a two-channel voltmeter matching the M2K DMM (AC/DC, ±25 V).
+
+**Implement:**
+- `src/components/Voltmeter.tsx` + nav entry + layout integration.
+- Two channels, each: **DC** (operating-point node voltage via `.op`/`.dc`) or **AC** (RMS of
+  a transient at the node), large numeric readout, ±25 V range, node/probe selector.
+- Reads from the simulated circuit via `core/netlist.ts` + the SPICE engine.
+
+**Acceptance criteria:**
+- For a resistive divider with known rails, the DC reading matches the analytic node voltage
+  within tolerance (verify in PROGRESS). AC mode reads correct RMS for a known sine.
+- Build clean; spectrum regression canary holds.
+
+**Files allowed:** `Voltmeter.tsx` (new), `App.tsx`, `core/netlist.ts`, `core/spice.ts` (call site), `index.css`/`Instrument.css`, docs.
 
 ---
 
