@@ -5,6 +5,8 @@ import { useMemo, useRef, useState, useEffect, type ReactElement } from 'react'
 import {
   Schematic, SchComponent, SchKind, terminalsOf, toCircuit,
 } from '../core/schematic'
+import { buildNetlist } from '../core/netlist'
+import { createSpiceEngine, type SpiceEngine, transferFunction } from '../core/spice'
 import './Instrument.css'
 
 const GRID = 24
@@ -57,8 +59,43 @@ export default function SchematicEditor() {
   const [wireStart, setWireStart] = useState<{ x: number; y: number } | null>(null)
   const [drag, setDrag] = useState<{ id: string; ox: number; oy: number } | null>(null)
   const [placeRotation, setPlaceRotation] = useState(0)
+  const [simStatus, setSimStatus] = useState('')
+  const [simBusy, setSimBusy] = useState(false)
+  const engineRef = useRef<SpiceEngine | null>(null)
 
   const result = useMemo(() => toCircuit(sch, 'Schematic'), [sch])
+
+  // Create the SPICE engine (worker) once for the Simulate action.
+  useEffect(() => {
+    engineRef.current = createSpiceEngine()
+    return () => { engineRef.current?.dispose(); engineRef.current = null }
+  }, [])
+
+  // SCH-2: build the netlist from the drawing and run it through the engine.
+  async function simulate() {
+    if (result.warnings.length) { setSimStatus('Cannot simulate — ' + result.warnings.join(' ')); return }
+    setSimBusy(true)
+    setSimStatus('simulating…')
+    try {
+      const nl = buildNetlist(result.circuit, { kind: 'ac', sweep: 'dec', points: 30, fStart: 10, fStop: 1e6 })
+      const res = await engineRef.current!.run(nl)
+      let extra = ''
+      try {
+        const tf = transferFunction(res, 'out', 'in')
+        const ref = tf.magDb[0]
+        let fc: number | null = null
+        for (let i = 1; i < tf.magDb.length; i++) {
+          if (tf.magDb[i - 1] >= ref - 3 && tf.magDb[i] < ref - 3) { fc = tf.freq[i]; break }
+        }
+        if (fc) extra = ' · -3 dB ' + (fc >= 1000 ? (fc / 1000).toFixed(2) + ' kHz' : fc.toFixed(0) + ' Hz')
+      } catch { /* not a simple low-pass — skip the cutoff readout */ }
+      setSimStatus('OK — simulated ' + res.numPoints + ' points' + extra)
+    } catch (e) {
+      setSimStatus('engine error: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setSimBusy(false)
+    }
+  }
 
   // Mouse position → snapped grid coordinates.
   function gridAt(e: React.MouseEvent): { gx: number; gy: number } {
@@ -145,6 +182,7 @@ export default function SchematicEditor() {
         <div className="display-header">
           <span className="display-title">Schematic Editor</span>
           <div className="display-controls">
+            <button className="run-btn active" onClick={simulate} disabled={simBusy}>{simBusy ? 'Simulating…' : '▶ Simulate'}</button>
             <button className="run-btn" onClick={rotate}>Rotate (R)</button>
             <button className="run-btn" onClick={deleteSelected} disabled={!selected}>Delete</button>
             <button className="run-btn" onClick={() => { setSch({ components: [], wires: [] }); setSelected(null) }}>Clear</button>
@@ -234,9 +272,14 @@ export default function SchematicEditor() {
             {result.warnings.map((w, i) => <li key={i}>{w}</li>)}
           </ul>
         )}
+        {simStatus && (
+          <div style={{ fontSize: 11, marginTop: 6, fontFamily: 'monospace', color: simStatus.startsWith('OK') ? 'var(--theory-color)' : '#ffaa55' }}>
+            {simStatus}
+          </div>
+        )}
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 8 }}>
-          Tip: place parts, then Wire-tool click two grid points to connect. Add a V src, a
-          Ground, and a Probe to mark the output. SCH-2/LOOP-1 will run this circuit.
+          Tip: place parts, wire them, then press Simulate. Needs a V src, a Ground, and a
+          Probe on the output. LOOP-1 will plot the result in the Network Analyzer.
         </div>
       </div>
     </div>

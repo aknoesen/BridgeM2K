@@ -143,6 +143,22 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
   if (!inNet) warnings.push('No source — add a voltage source (generator input).')
   if (!outNet) warnings.push('No output probe — mark the output node.')
 
+  // Connectivity checks: count real (non-marker) component terminals per net.
+  const termCount = new Map<string, number>()
+  for (const c of s.components) {
+    if (c.kind === 'ground' || c.kind === 'probe') continue
+    for (const t of terminalsOf(c)) {
+      const n = netOf(t.gx, t.gy)
+      termCount.set(n, (termCount.get(n) ?? 0) + 1)
+    }
+  }
+  if (inNet && (termCount.get(inNet) ?? 0) < 2) {
+    warnings.push('Source output (in) is not connected to the rest of the circuit.')
+  }
+  if (outNet && (termCount.get(outNet) ?? 0) < 1) {
+    warnings.push('Output node (out) is not connected to any component.')
+  }
+
   const rename = (net: string) =>
     net === groundNet ? '0' : net === inNet ? 'in' : net === outNet ? 'out' : net
 

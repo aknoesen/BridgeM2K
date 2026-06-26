@@ -46,3 +46,32 @@ describe('schematic toCircuit', () => {
     expect(cutoff).toBeLessThan(1100)
   }, 30000)
 })
+
+describe('schematic validation', () => {
+  it('warns when ground is missing', () => {
+    const noGround: Schematic = {
+      components: [
+        { id: 'V1', kind: 'vsource', gx: 0, gy: 0 },
+        { id: 'R1', kind: 'resistor', gx: 4, gy: 0, value: 1000 },
+        { id: 'P1', kind: 'probe', gx: 6, gy: 0 },
+      ],
+      wires: [{ x1: 0, y1: 0, x2: 4, y2: 0 }],
+    }
+    const { warnings } = toCircuit(noGround)
+    expect(warnings.some((w) => w.toLowerCase().includes('ground'))).toBe(true)
+  })
+
+  it('warns when the source output is floating', () => {
+    const floating: Schematic = {
+      components: [
+        { id: 'V1', kind: 'vsource', gx: 0, gy: 0 }, // + at (0,0), not wired anywhere
+        { id: 'G1', kind: 'ground', gx: 2, gy: 0 },  // wired to V- at (2,0)
+        { id: 'R1', kind: 'resistor', gx: 8, gy: 4, value: 1000 },
+        { id: 'P1', kind: 'probe', gx: 8, gy: 4 },
+      ],
+      wires: [],
+    }
+    const { warnings } = toCircuit(floating)
+    expect(warnings.some((w) => w.toLowerCase().includes('not connected'))).toBe(true)
+  })
+})

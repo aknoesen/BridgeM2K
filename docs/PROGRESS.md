@@ -36,6 +36,41 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-26 — SCH-2 Simulate + validation (plus SCH-1 polish) — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**What I did:**
+- `src/core/schematic.ts`: connectivity validation in `toCircuit` — flags a floating source
+  (`in` net with <2 component terminals) and a floating output (`out` with no component
+  terminal), on top of the existing no-ground / no-source / no-probe warnings.
+- `src/components/SchematicEditor.tsx`: a **Simulate** button that builds the netlist from the
+  drawing and runs it through the SPICE worker, reporting points + (-3 dB cutoff if it reads
+  as a low-pass) or the engine error. Blocks with the validation message if the circuit is
+  incomplete.
+- SCH-1 polish in the same area: **DC supply rail** part (`dcrail` → SPICE `DCRail`, editable
+  volts, default +5 V) and **op-amp +/- input labels**; rotate-after-place (click any part to
+  select, then R / Rotate button).
+- Tests: added missing-ground and floating-source validation cases.
+
+**Verification (Definition of Done):**
+- build clean: `tsc && vite build` green (30 modules; index.js ~4.84 MB; engine still in the
+  worker chunk only).
+- **Tests: 11/11 pass** (netlist 3, scope 3, bode 1, schematic 4). Validation tests confirm
+  missing-ground and floating-source warnings.
+- 12-bit spectrum canary: signal.ts untouched; unaffected.
+
+**State for the next session:**
+- The editor can now draw → validate → simulate a circuit end to end inside the Circuit panel.
+- LOOP-1: lift the editor's `result.circuit` to App and pass it to `<NetworkAnalyzer circuit=…>`
+  (the prop already exists) and to Scope CH2 (transient via `circuit-out`). Needs OSC-2 (CH2)
+  for the scope side; the Bode side can land first.
+
+**Open questions / flags for andre:**
+- Runtime check: open Circuit, draw V src→R→out(C→Gnd) with a Probe on out, press Simulate;
+  expect "OK — simulated N points · -3 dB ≈ 1.00 kHz".
+
 ### 2026-06-26 — SCH-1 Browser schematic editor — DONE
 
 **By:** Claude Code session (in Cowork)
