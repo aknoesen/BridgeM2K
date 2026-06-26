@@ -77,6 +77,7 @@ ADC noise); wired through a circuit it reads a SPICE `.tran` of that node.
 | WIRE-1 | Breadboard ports in the schematic (W1/W2, Scope1/2) + toCircuit net mapping | SCH-1 | DONE |
 | WIRE-2 | Instruments read from their wired node (direct fast path + `.tran`) | WIRE-1, OSC-2 | DONE |
 | WIRE-3 | Scope/Spectrum read their wired node via `.tran`; non-sine PULSE drive | WIRE-2 | TODO |
+| EDIT-1 | Rubber-band wires: endpoints follow a component when it is moved/rotated | SCH-1 | TODO |
 
 Notes:
 - WIRE-1 replaced the old "V src"/"Probe" palette items with **W1/W2** (gen outputs) and
@@ -84,6 +85,41 @@ Notes:
   `probe` kinds for back-compat. The Network Analyzer still uses the `in`/`out` nets.
 - WIRE-2 is where the standalone scope/spectrum actually read the node they are wired to
   (today they still read the generator directly). It also finishes LOOP-1's scope half.
+- **EDIT-1 (rubber-band)** — today a wire is two fixed grid endpoints; moving a connected
+  component leaves its wires behind. Make any wire endpoint that coincides with a component
+  terminal **track that terminal** when the component is dragged or rotated, so the connection
+  visibly stretches and stays attached. Design: on move/rotate, recompute the component's
+  terminals (`terminalsOf` in `schematic.ts`); for each wire endpoint equal to an old terminal
+  coord, snap it to the new coord in the same state update. Pure model helper in `schematic.ts`
+  + the drag handler in `SchematicEditor.tsx`; nets are recomputed by the existing `computeNets`
+  union-find, so connectivity is preserved by construction. Acceptance: drag an R wired on both
+  pins → both wires follow; rotate it → endpoints move to the rotated terminals; `computeNets`
+  reports the same nets. Endpoints-only for this phase (no mid-wire bends). Small self-contained
+  editor UX win; schedule independently of WIRE-3/LOOP.
+
+## Track E — Dockable panels + saveable workspaces
+
+Spec: `docs/specs/docking-workspace.md`
+
+| Phase | Title | Depends on | Status |
+|-------|-------|-----------|--------|
+| E-1 | Preset snap layouts (lab-keyed multi-panel, no new dependency) | OSC-2, NET-1 | TODO |
+| E-2 | True dockable panels via docking lib (dockview) + geometry workspace save/load | E-1 | TODO |
+| E-3 | Full-config workspace (persist each instrument's settings) — OPTIONAL | E-2 | TODO |
+
+Notes:
+- **Do not start mid-feature.** This refactors the `<main>` panel-mount block in `App.tsx`;
+  land the circuit-loop MVP (WIRE-3 / LOOP-1) on a stable instrument set first.
+- **Two-tier cost:** saving panel *geometry* is cheap (a docking lib serializes it; localStorage
+  pattern already exists). Saving each instrument's *config* is expensive because much of it lives
+  in component-local `useState` (per CONVENTIONS §4) and would have to be lifted — that is E-3 and
+  touches every component. Decide per phase which tier is in scope.
+- **Do not hand-roll docking.** E-2 adopts **dockview** (TS-native, layout JSON serialize)
+  behind a `components/Workbench.tsx` wrapper (swappable, like the SpiceEngine adapter). This is a
+  new core runtime dependency → CONVENTIONS §2 requires a PROGRESS note + director sign-off.
+- **Pedagogy caution:** real Scopy has a fixed tool menu. Free docking can confuse first-years
+  ("I lost my Spectrum panel"). E-1 presets may be the right stopping point for the course.
+- None of Track E touches `core/signal.ts`; the 12-bit canary must hold throughout.
 
 ## Recommended session sequence
 

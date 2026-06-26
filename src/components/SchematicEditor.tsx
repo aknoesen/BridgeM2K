@@ -116,15 +116,44 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
     }
   }
 
-  // SCH-3: save the circuit to a .json file the student can keep / share / submit.
-  function saveCircuit() {
-    const blob = new Blob([JSON.stringify(sch, null, 2)], { type: 'application/json' })
+  // SCH-3: save the circuit to a .json file the student names. Uses the native Save dialog
+  // (File System Access API) when the browser supports it, else falls back to a name prompt.
+  async function saveCircuit() {
+    const json = JSON.stringify(sch, null, 2)
+    const sfp = (window as unknown as {
+      showSavePicker?: (o: {
+        suggestedName?: string
+        types?: { description?: string; accept: Record<string, string[]> }[]
+      }) => Promise<{ name: string; createWritable: () => Promise<{ write: (d: string) => Promise<void>; close: () => Promise<void> }> }>
+    }).showSavePicker
+    if (typeof sfp === 'function') {
+      try {
+        const handle = await sfp({
+          suggestedName: 'm2k-circuit.json',
+          types: [{ description: 'M2K circuit', accept: { 'application/json': ['.json'] } }],
+        })
+        const w = await handle.createWritable()
+        await w.write(json)
+        await w.close()
+        setSimStatus('saved ' + handle.name)
+        return
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return // user cancelled the dialog
+        // any other error: fall through to the download fallback below
+      }
+    }
+    let name = prompt('Save circuit as:', 'm2k-circuit.json')
+    if (name === null) return // cancelled
+    name = name.trim() || 'm2k-circuit.json'
+    if (!name.toLowerCase().endsWith('.json')) name += '.json'
+    const blob = new Blob([json], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'm2k-circuit.json'
+    a.download = name
     a.click()
     URL.revokeObjectURL(url)
+    setSimStatus('saved ' + name)
   }
   function openCircuit(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -391,18 +420,51 @@ function renderSymbol(c: SchComponent, px: (g: number) => number, selected: bool
   )
 
   let inner: ReactElement
-  if (c.kind === 'resistor' || c.kind === 'capacitor' || c.kind === 'inductor' || c.kind === 'vsource') {
+  if (c.kind === 'resistor') {
     const x1 = ax, x2 = ax + G(2), y = ay, cx = ax + G(1)
-    const label = c.kind === 'resistor' ? 'R' : c.kind === 'capacitor' ? 'C' : c.kind === 'inductor' ? 'L' : 'V'
+    // American zigzag resistor
+    const zig = `${x1},${y} ${cx - 18},${y} ${cx - 15},${y - 7} ${cx - 9},${y + 7} ${cx - 3},${y - 7} ${cx + 3},${y + 7} ${cx + 9},${y - 7} ${cx + 15},${y + 7} ${cx + 18},${y} ${x2},${y}`
     inner = (
       <g>
-        <line x1={x1} y1={y} x2={cx - 16} y2={y} stroke={stroke} strokeWidth={sw} />
-        <line x1={cx + 16} y1={y} x2={x2} y2={y} stroke={stroke} strokeWidth={sw} />
-        {c.kind === 'vsource'
-          ? <circle cx={cx} cy={y} r={14} fill="none" stroke={stroke} strokeWidth={sw} />
-          : <rect x={cx - 16} y={y - 9} width={32} height={18} rx={2} fill="var(--bg-panel)" stroke={stroke} strokeWidth={sw} />}
+        <polyline points={zig} fill="none" stroke={stroke} strokeWidth={sw} />
         {upright(cx, y - 13, <text x={cx} y={y - 13} fill="var(--text-secondary)" fontSize={10} textAnchor="middle">{c.id}</text>)}
-        {upright(cx, y + 4, <text x={cx} y={y + 4} fill="var(--text-primary)" fontSize={10} textAnchor="middle">{label}</text>)}
+        {upright(cx, y + 18, <text x={cx} y={y + 18} fill="var(--text-primary)" fontSize={10} textAnchor="middle">R</text>)}
+      </g>
+    )
+  } else if (c.kind === 'capacitor') {
+    const x1 = ax, x2 = ax + G(2), y = ay, cx = ax + G(1)
+    inner = (
+      <g>
+        <line x1={x1} y1={y} x2={cx - 4} y2={y} stroke={stroke} strokeWidth={sw} />
+        <line x1={cx + 4} y1={y} x2={x2} y2={y} stroke={stroke} strokeWidth={sw} />
+        <line x1={cx - 4} y1={y - 11} x2={cx - 4} y2={y + 11} stroke={stroke} strokeWidth={sw} />
+        <line x1={cx + 4} y1={y - 11} x2={cx + 4} y2={y + 11} stroke={stroke} strokeWidth={sw} />
+        {upright(cx, y - 15, <text x={cx} y={y - 15} fill="var(--text-secondary)" fontSize={10} textAnchor="middle">{c.id}</text>)}
+        {upright(cx, y + 20, <text x={cx} y={y + 20} fill="var(--text-primary)" fontSize={10} textAnchor="middle">C</text>)}
+      </g>
+    )
+  } else if (c.kind === 'vsource') {
+    const x1 = ax, x2 = ax + G(2), y = ay, cx = ax + G(1)
+    inner = (
+      <g>
+        <line x1={x1} y1={y} x2={cx - 14} y2={y} stroke={stroke} strokeWidth={sw} />
+        <line x1={cx + 14} y1={y} x2={x2} y2={y} stroke={stroke} strokeWidth={sw} />
+        <circle cx={cx} cy={y} r={14} fill="none" stroke={stroke} strokeWidth={sw} />
+        {upright(cx, y - 18, <text x={cx} y={y - 18} fill="var(--text-secondary)" fontSize={10} textAnchor="middle">{c.id}</text>)}
+        {upright(cx, y + 4, <text x={cx} y={y + 4} fill="var(--text-primary)" fontSize={11} textAnchor="middle">V</text>)}
+      </g>
+    )
+  } else if (c.kind === 'inductor') {
+    const x1 = ax, x2 = ax + G(2), y = ay, cx = ax + G(1)
+    // coil = four upward semicircle humps across 36px, centered on cx
+    const coil = `M ${cx - 18} ${y} a 4.5 4.5 0 0 1 9 0 a 4.5 4.5 0 0 1 9 0 a 4.5 4.5 0 0 1 9 0 a 4.5 4.5 0 0 1 9 0`
+    inner = (
+      <g>
+        <line x1={x1} y1={y} x2={cx - 18} y2={y} stroke={stroke} strokeWidth={sw} />
+        <line x1={cx + 18} y1={y} x2={x2} y2={y} stroke={stroke} strokeWidth={sw} />
+        <path d={coil} fill="none" stroke={stroke} strokeWidth={sw} />
+        {upright(cx, y - 13, <text x={cx} y={y - 13} fill="var(--text-secondary)" fontSize={10} textAnchor="middle">{c.id}</text>)}
+        {upright(cx, y + 18, <text x={cx} y={y + 18} fill="var(--text-primary)" fontSize={10} textAnchor="middle">L</text>)}
       </g>
     )
   } else if (c.kind === 'opamp') {

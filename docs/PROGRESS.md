@@ -36,6 +36,38 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-26 — Planning: Track E (docking/workspace) + EDIT-1 (rubber-band) — DONE (docs only)
+
+**By:** Claude Code session (in Cowork) — project-director planning, no code
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**What I did:**
+- New spec `docs/specs/docking-workspace.md` for **Track E** — dockable panels + saveable
+  workspaces. Three phases: **E-1** preset snap layouts (no new dep, generalizes the split view
+  into lab-keyed multi-panel presets), **E-2** true docking via **dockview** + geometry-only
+  workspace save/load, **E-3** optional full-config workspace (persist each instrument's local
+  settings — the expensive tier that touches every component).
+- Captured the **two-tier cost** decision: geometry save is cheap, instrument-config save is the
+  real refactor (component-local state per CONVENTIONS §4 must be lifted). Director picks the tier.
+- Engine call: **do not hand-roll docking**; adopt dockview behind a `Workbench.tsx` wrapper
+  (swappable, mirrors the SpiceEngine adapter). New runtime dep → needs sign-off per CONVENTIONS §2.
+- Added **EDIT-1** to Track D: rubber-band wires (wire endpoints follow a component when it is
+  moved/rotated). Design noted in ROADMAP — pure `schematic.ts` helper + the `SchematicEditor`
+  drag handler; `computeNets` preserves connectivity by construction.
+- ROADMAP: added Track E block (E-1/E-2/E-3 TODO) and the EDIT-1 row (TODO).
+
+**Verification (Definition of Done):**
+- docs only; no build/test impact. signal.ts untouched; 12-bit canary unaffected.
+
+**State for the next session:**
+- Track E is specced but **deliberately not started** — finish the circuit-loop MVP (WIRE-3 /
+  LOOP-1) on a stable instrument set first, then take E-1.
+- EDIT-1 is a small self-contained editor win that can be slotted any time.
+
+**Open questions / flags for andre:**
+- Decide whether the course wants free docking (E-2/E-3) or whether E-1 presets are enough.
+- E-2 requires approving **dockview** as a new runtime dependency.
+
 ### 2026-06-26 — PSU-1 Power Supply instrument — DONE
 
 **By:** Claude Code session (in Cowork)
