@@ -36,6 +36,38 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-26 — NET-1 Network Analyzer (Bode) — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**What I did:**
+- `src/core/spice.ts`: added `transferFunction(result, out, in)` → `{freq, magDb, phaseDeg}`
+  computing H = V(out)/V(in) (complex division) from a complex AC `SimResult`.
+- `src/components/NetworkAnalyzer.tsx`: Scopy-style Bode instrument — stacked magnitude (dB)
+  and phase (deg) plots vs log frequency. Controls: start/stop frequency, points/decade,
+  magnitude min/max (defaults -90..10 dB; phase fixed -180..180, 45° ticks). Runs an `.ac`
+  sweep through the SPICE worker on a default RC low-pass; marks the -3 dB cutoff.
+- `App.tsx`: "Network" nav entry; renders in single view. Component accepts an optional
+  `circuit` prop so LOOP-1 can feed the drawn circuit instead of the default RC.
+- `src/core/spice.test.ts`: Vitest for the Bode math.
+
+**Verification (Definition of Done):**
+- build clean: `tsc && vite build` green (28 modules; index.js ~4.83 MB; engine still isolated
+  to the 20 MB worker chunk).
+- **Tests: 7/7 pass** (netlist 3, scope 3, bode 1). Bode test on the default RC: passband
+  ~0 dB, -3 dB cutoff in (950, 1050) Hz, phase at 1 kHz in (-50, -40)° — i.e. ≈ -45°.
+- 12-bit spectrum canary: signal.ts untouched; unaffected.
+
+**State for the next session:**
+- The Network Analyzer is a working Bode instrument over a default RC. LOOP-1 will pass the
+  schematic-editor circuit in via the `circuit` prop and route transient output to Scope CH2.
+- Remaining for the circuit loop: SCH-1 (editor), SCH-2 (editor→netlist), then LOOP-1.
+
+**Open questions / flags for andre:**
+- Runtime visual check: open the Network tab; expect a low-pass roll-off with the -3 dB
+  marker near 1 kHz and phase passing -45° at the cutoff.
+
 ### 2026-06-26 — OSC-1 Oscilloscope panel (timebase + CH1) — DONE
 
 **By:** Claude Code session (in Cowork)

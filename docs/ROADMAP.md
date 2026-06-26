@@ -33,7 +33,7 @@ Spec: `docs/specs/schematic-ngspice.md`
 | SPICE-2 | Circuit graph model + netlist generator (`core/netlist.ts`) | SPICE-1 | DONE |
 | SCH-1 | Browser schematic editor MVP (place/wire R,C,L,V,opamp,gnd) | — | TODO |
 | SCH-2 | Bind editor → circuit graph → netlist | SCH-1, SPICE-2 | TODO |
-| NET-1 | Network Analyzer instrument (Bode mag+phase, sine-sweep via ngspice `.ac`) | SPICE-2 | TODO |
+| NET-1 | Network Analyzer instrument (Bode mag+phase, sine-sweep via ngspice `.ac`) | SPICE-2 | DONE |
 | LOOP-1 | Close the loop: generator → circuit → Network Analyzer (AC Bode) + Scope CH2 (transient) | SCH-2, OSC-2, NET-1 | TODO |
 | LOOP-2 | Live value tuning + transient/AC toggle + −3 dB cursor | LOOP-1 | TODO |
 | KICAD-1 | (Stretch) KiCad netlist import | LOOP-1 | TODO |

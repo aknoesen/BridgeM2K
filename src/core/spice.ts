@@ -127,3 +127,43 @@ class WorkerSpiceEngine implements SpiceEngine {
 export function createSpiceEngine(): SpiceEngine {
   return new WorkerSpiceEngine()
 }
+
+// ── Bode transfer function (NET-1) ─────────────────────────────────────────────
+// Compute H(f) = V(out)/V(in) from a complex AC SimResult, as magnitude (dB) and phase
+// (deg). Used by the Network Analyzer instrument. `outName`/`inName` are matched against
+// variable names as `(name)` — e.g. 'out' matches 'v(out)'.
+
+export interface Bode {
+  freq: Float64Array
+  magDb: Float64Array
+  phaseDeg: Float64Array
+}
+
+export function transferFunction(r: SimResult, outName: string, inName: string): Bode {
+  const fi = r.variables.findIndex((v) => v.type === 'frequency')
+  const oi = r.variables.findIndex((v) => v.name.toLowerCase().includes(`(${outName.toLowerCase()})`))
+  const ii = r.variables.findIndex((v) => v.name.toLowerCase().includes(`(${inName.toLowerCase()})`))
+  const fcol = r.columns[fi]
+  const ocol = r.columns[oi]
+  const icol = r.columns[ii]
+  if (
+    !fcol || fcol.kind !== 'complex' ||
+    !ocol || ocol.kind !== 'complex' ||
+    !icol || icol.kind !== 'complex'
+  ) {
+    throw new Error('transferFunction requires a complex AC result with frequency, out and in')
+  }
+  const n = r.numPoints
+  const freq = new Float64Array(n)
+  const magDb = new Float64Array(n)
+  const phaseDeg = new Float64Array(n)
+  for (let k = 0; k < n; k++) {
+    freq[k] = fcol.re[k]
+    const denom = icol.re[k] * icol.re[k] + icol.im[k] * icol.im[k]
+    const hre = (ocol.re[k] * icol.re[k] + ocol.im[k] * icol.im[k]) / denom
+    const him = (ocol.im[k] * icol.re[k] - ocol.re[k] * icol.im[k]) / denom
+    magDb[k] = 20 * Math.log10(Math.hypot(hre, him))
+    phaseDeg[k] = Math.atan2(him, hre) * (180 / Math.PI)
+  }
+  return { freq, magDb, phaseDeg }
+}

@@ -4,6 +4,7 @@ import { DEFAULT_CHANNELS, resolveChannelSamples, ChannelInputs } from './core/s
 import SignalGenerator from './components/SignalGenerator'
 import SpectrumAnalyzer from './components/SpectrumAnalyzer'
 import Oscilloscope from './components/Oscilloscope'
+import NetworkAnalyzer from './components/NetworkAnalyzer'
 import SpiceDevPanel from './components/SpiceDevPanel'
 import './App.css'
 
@@ -11,7 +12,7 @@ import './App.css'
 // builds the real circuit UI. See docs/specs/schematic-ngspice.md.
 const SHOW_SPICE_DEV = true
 
-type ActiveInstrument = 'siggen' | 'spectrum' | 'scope' | 'spice'
+type ActiveInstrument = 'siggen' | 'spectrum' | 'scope' | 'network' | 'spice'
 type LayoutMode = 'single' | 'split'
 
 const DEFAULT_PARAMS: SignalParams = {
@@ -120,6 +121,15 @@ export default function App() {
         </button>
 
         <button
+          className={`nav-btn ${active === 'network' && layout === 'single' ? 'nav-active' : ''}`}
+          onClick={() => { setActive('network'); setLayout('single') }}
+          title="Network Analyzer (Bode)"
+        >
+          <span className="nav-icon">&#9678;</span>
+          <span className="nav-label">Network</span>
+        </button>
+
+        <button
           className={`nav-btn ${layout === 'split' ? 'nav-active' : ''}`}
           onClick={() => setLayout(l => l === 'split' ? 'single' : 'split')}
           title="Split view: Signal Gen + Spectrum"
@@ -149,6 +159,8 @@ export default function App() {
             running={running}
             onRunToggle={() => setRunning(r => !r)}
           />
+        ) : layout === 'single' && active === 'network' ? (
+          <NetworkAnalyzer />
         ) : layout === 'single' && active === 'spice' && SHOW_SPICE_DEV ? (
           <SpiceDevPanel />
         ) : (
