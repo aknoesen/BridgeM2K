@@ -153,3 +153,8 @@ label {
   --node-color: #66ccff;
   --wire-color: #88aa88;
 }
+
+/* Oscilloscope CH2 (OSC-2) */
+:root {
+  --ch2-color: #40c0e0;
+}

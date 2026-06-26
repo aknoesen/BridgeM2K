@@ -20,16 +20,21 @@ const TOOLS: { tool: Tool; label: string }[] = [
   { tool: 'resistor', label: 'R' },
   { tool: 'capacitor', label: 'C' },
   { tool: 'inductor', label: 'L' },
-  { tool: 'vsource', label: 'V src' },
   { tool: 'opamp', label: 'Op-amp' },
-  { tool: 'ground', label: 'Gnd' },
-  { tool: 'dcrail', label: 'Supply' },
-  { tool: 'probe', label: 'Probe' },
+  { tool: 'awg1', label: 'W1' },
+  { tool: 'awg2', label: 'W2' },
+  { tool: 'scope1', label: '1+' },
+  { tool: 'adc1n', label: '1-' },
+  { tool: 'scope2', label: '2+' },
+  { tool: 'adc2n', label: '2-' },
+  { tool: 'vplus', label: 'V+' },
+  { tool: 'vminus', label: 'V-' },
+  { tool: 'ground', label: 'GND' },
 ]
 
-const UNIT: Partial<Record<SchKind, string>> = { resistor: 'Ω', capacitor: 'F', inductor: 'H', dcrail: 'V' }
+const UNIT: Partial<Record<SchKind, string>> = { resistor: 'Ω', capacitor: 'F', inductor: 'H', dcrail: 'V', vplus: 'V', vminus: 'V' }
 const DEFAULT_VALUE: Partial<Record<SchKind, number>> = {
-  resistor: 1000, capacitor: 1e-9, inductor: 1e-3, dcrail: 5,
+  resistor: 1000, capacitor: 1e-9, inductor: 1e-3, dcrail: 5, vplus: 5, vminus: -5,
 }
 
 // Parse engineering notation like "1k", "159n", "4.7u" → number.
@@ -233,7 +238,8 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
                 stroke={selectedWire === i ? 'var(--accent-blue)' : 'var(--wire-color)'}
                 strokeWidth={selectedWire === i ? 3 : 2} />
               <line x1={px(w.x1)} y1={px(w.y1)} x2={px(w.x2)} y2={px(w.y2)}
-                stroke="transparent" strokeWidth={12} style={{ cursor: tool === 'wire' ? 'crosshair' : 'pointer' }}
+                stroke="transparent" strokeWidth={12}
+                style={{ cursor: tool === 'wire' ? 'crosshair' : 'pointer', pointerEvents: tool === 'wire' ? 'none' : 'auto' }}
                 onClick={(e) => onWireClick(e, i)} />
             </g>
           ))}
@@ -255,7 +261,7 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
           {/* components */}
           {sch.components.map((c) => (
             <g key={c.id} onMouseDown={(e) => onComponentDown(e, c.id)} onClick={(e) => e.stopPropagation()}
-              style={{ cursor: tool === 'select' ? 'move' : 'pointer' }}>
+              style={{ cursor: tool === 'select' ? 'move' : 'pointer', pointerEvents: tool === 'wire' ? 'none' : 'auto' }}>
               {renderSymbol(c, px, c.id === selected)}
               {terminalsOf(c).map((t, i) => (
                 <circle key={i} cx={px(t.gx)} cy={px(t.gy)} r={3} fill="var(--node-color)" />
@@ -272,6 +278,11 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
             <button key={t.tool} className={tool === t.tool ? 'active' : ''}
               onClick={() => { setTool(t.tool); setWireStart(null) }}>{t.label}</button>
           ))}
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.6 }}>
+          M2K pins — <b style={{ color: '#e0c020' }}>W1/W2</b> outputs, <b style={{ color: 'var(--ch1-color)' }}>1+/1-</b> Ch1 in,
+          <b style={{ color: 'var(--ch2-color)' }}> 2+/2-</b> Ch2 in, <b style={{ color: '#e04040' }}>V+</b> /
+          <b style={{ color: '#4a9eff' }}>V-</b> supply, <b style={{ color: '#cccccc' }}>GND</b>.
         </div>
 
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4 }}>
@@ -366,22 +377,48 @@ function renderSymbol(c: SchComponent, px: (g: number) => number, selected: bool
     )
   } else if (c.kind === 'ground') {
     const x = ax, y = ay
+    const col = '#cccccc' // GND = black wire; rendered light for contrast on the dark canvas
     inner = (
       <g>
-        <line x1={x} y1={y} x2={x} y2={y + 10} stroke={stroke} strokeWidth={sw} />
-        <line x1={x - 9} y1={y + 10} x2={x + 9} y2={y + 10} stroke={stroke} strokeWidth={sw} />
-        <line x1={x - 5} y1={y + 14} x2={x + 5} y2={y + 14} stroke={stroke} strokeWidth={sw} />
-        <line x1={x - 2} y1={y + 18} x2={x + 2} y2={y + 18} stroke={stroke} strokeWidth={sw} />
+        <line x1={x} y1={y} x2={x} y2={y + 10} stroke={col} strokeWidth={sw} />
+        <line x1={x - 9} y1={y + 10} x2={x + 9} y2={y + 10} stroke={col} strokeWidth={sw} />
+        <line x1={x - 5} y1={y + 14} x2={x + 5} y2={y + 14} stroke={col} strokeWidth={sw} />
+        <line x1={x - 2} y1={y + 18} x2={x + 2} y2={y + 18} stroke={col} strokeWidth={sw} />
+        {upright(x, y + 30, <text x={x} y={y + 30} fill={col} fontSize={9} textAnchor="middle">GND</text>)}
       </g>
     )
-  } else if (c.kind === 'dcrail') {
+  } else if (c.kind === 'dcrail' || c.kind === 'vplus' || c.kind === 'vminus') {
     const x = ax, y = ay
-    const v = c.value ?? 5
+    const v = c.value ?? (c.kind === 'vminus' ? -5 : 5)
+    const neg = c.kind === 'vminus' || v < 0
+    const col = neg ? '#4a9eff' : '#e04040' // V- blue, V+ red
+    const lbl = c.kind === 'vplus' ? 'V+' : c.kind === 'vminus' ? 'V-' : (v >= 0 ? '+' : '') + v + 'V'
     inner = (
       <g>
-        <line x1={x} y1={y} x2={x} y2={y - 14} stroke="var(--accent-blue)" strokeWidth={sw} />
-        <line x1={x - 8} y1={y - 14} x2={x + 8} y2={y - 14} stroke="var(--accent-blue)" strokeWidth={sw} />
-        {upright(x, y - 18, <text x={x} y={y - 18} fill="var(--accent-blue)" fontSize={9} textAnchor="middle">{(v >= 0 ? '+' : '') + v + 'V'}</text>)}
+        <line x1={x} y1={y} x2={x} y2={y - 14} stroke={col} strokeWidth={sw} />
+        <line x1={x - 8} y1={y - 14} x2={x + 8} y2={y - 14} stroke={col} strokeWidth={sw} />
+        {upright(x, y - 18, <text x={x} y={y - 18} fill={col} fontSize={9} textAnchor="middle">{lbl}</text>)}
+      </g>
+    )
+  } else if (c.kind === 'awg1' || c.kind === 'awg2') {
+    const x = ax, y = ay
+    const lbl = c.kind === 'awg1' ? 'W1' : 'W2'
+    inner = (
+      <g>
+        <circle cx={x} cy={y} r={11} fill="var(--bg-panel)" stroke="#e0c020" strokeWidth={sw} />
+        <path d={`M ${x - 6} ${y} q 3 -6 6 0 q 3 6 6 0`} fill="none" stroke="#e0c020" strokeWidth={1.4} />
+        {upright(x, y - 16, <text x={x} y={y - 16} fill="#e0c020" fontSize={10} textAnchor="middle">{lbl}</text>)}
+      </g>
+    )
+  } else if (c.kind === 'scope1' || c.kind === 'scope2' || c.kind === 'adc1n' || c.kind === 'adc2n') {
+    const x = ax, y = ay
+    const ch1 = c.kind === 'scope1' || c.kind === 'adc1n'
+    const col = ch1 ? 'var(--ch1-color)' : 'var(--ch2-color)'
+    const lbl = c.kind === 'scope1' ? '1+' : c.kind === 'adc1n' ? '1-' : c.kind === 'scope2' ? '2+' : '2-'
+    inner = (
+      <g>
+        <polygon points={`${x},${y - 9} ${x + 8},${y} ${x},${y + 9} ${x - 8},${y}`} fill="none" stroke={col} strokeWidth={sw} />
+        {upright(x, y - 13, <text x={x} y={y - 13} fill={col} fontSize={9} textAnchor="middle">{lbl}</text>)}
       </g>
     )
   } else {

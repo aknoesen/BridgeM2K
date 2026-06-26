@@ -75,3 +75,34 @@ describe('schematic validation', () => {
     expect(warnings.some((w) => w.toLowerCase().includes('not connected'))).toBe(true)
   })
 })
+
+describe('breadboard ports (WIRE-1)', () => {
+  it('W1 + Scope1 ports build the RC and simulate to ~1 kHz', async () => {
+    const sch: Schematic = {
+      components: [
+        { id: 'W1', kind: 'awg1', gx: 0, gy: 0 },
+        { id: 'R1', kind: 'resistor', gx: 4, gy: 0, value: 1000 },
+        { id: 'C1', kind: 'capacitor', gx: 6, gy: 0, value: 159.155e-9 },
+        { id: 'G1', kind: 'ground', gx: 8, gy: 0 },
+        { id: 'P1', kind: 'scope1', gx: 6, gy: 0 },
+      ],
+      wires: [{ x1: 0, y1: 0, x2: 4, y2: 0 }], // W1 → R.a → 'in'
+    }
+    const { circuit, warnings } = toCircuit(sch)
+    expect(warnings).toEqual([])
+    const r = circuit.components.find((c) => c.kind === 'resistor')!
+    expect((r as { nodes: string[] }).nodes).toEqual(['in', 'out'])
+
+    const nl = buildNetlist(circuit, { kind: 'ac', sweep: 'dec', points: 50, fStart: 10, fStop: 1e6 })
+    const sim = new Simulation()
+    await sim.start()
+    sim.setNetList(nl)
+    const tf = transferFunction(normalizeResult(await sim.runSim()), 'out', 'in')
+    let cutoff = NaN
+    for (let i = 1; i < tf.magDb.length; i++) {
+      if (tf.magDb[i - 1] >= -3 && tf.magDb[i] < -3) { cutoff = tf.freq[i]; break }
+    }
+    expect(cutoff).toBeGreaterThan(900)
+    expect(cutoff).toBeLessThan(1100)
+  }, 30000)
+})

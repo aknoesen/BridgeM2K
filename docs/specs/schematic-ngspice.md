@@ -129,6 +129,30 @@ dep if added), docs.
 
 ---
 
+## Design note — analysis-aware sources (WIRE-2)
+
+A breadboard port has a role, but its SPICE source line depends on the analysis the instrument
+runs. The SAME W1 port emits differently:
+
+| Instrument | Analysis | W1 netlist line | Why |
+|-----------|----------|-----------------|-----|
+| Network Analyzer | `.ac` | `Vw1 in 0 AC 1` | transfer function V(out)/V(in) cancels amplitude; freq swept by `.ac` |
+| Scope / Spectrum | `.tran` | `Vw1 in 0 SIN(off amp f)` / `PULSE(...)` | real Signal-Generator waveform drives the circuit in time |
+| Voltmeter | `.op` / `.dc` | `Vw1 in 0 DC <level>` | static node voltages |
+
+Implementation (WIRE-2):
+1. Thread the Signal Generator params into `toCircuit(schematic, { w1, w2 })` so W1/W2 carry
+   waveType/freq/amplitude/offset (W1 = generator 1, W2 = generator 2).
+2. `buildNetlist(circuit, analysis)` switches each source line on `analysis.kind` (it already
+   emits `AC 1` for `ac` and `SIN(...)` for `tran`; add `PULSE` for square + a DC branch).
+3. Each instrument requests its analysis: Network Analyzer → `ac`; Scope/Spectrum → `tran`;
+   Voltmeter → `op`. The instrument then reads the relevant node(s) from the result
+   (1+ minus 1- for a differential ADC channel).
+
+This is the seam that makes one drawn circuit serve every instrument correctly.
+
+---
+
 ## Phase SCH-1 — Browser schematic editor MVP
 
 **Goal:** a lightweight, first-year-friendly node-and-wire editor. **Not** KiCad.

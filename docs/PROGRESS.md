@@ -36,6 +36,105 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-26 — WIRE-1b Exact M2K pin nomenclature + colors — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**Source of truth:** EEC1 Lab 1 + the adaptor-board silkscreen images. Top row `1+ 2+ ⏚ V+ W1 ⏚ TI`,
+bottom row `1- 2- ⏚ V- W2 ⏚`. The twin's breadboard ports now match exactly.
+
+**What I did:**
+- `src/core/schematic.ts`: added the differential ADC terminals `adc1n` (1-) / `adc2n` (2-) and
+  split supply into `vplus` (V+) / `vminus` (V-). `toCircuit` maps them: 1+→`out`, 1-→`out_n`,
+  2+→`scope2`, 2-→`scope2_n`; V+/V- → DC rails (+5/-5 default). (Differential reading lands with
+  the Voltmeter / WIRE-2.)
+- `src/components/SchematicEditor.tsx`: palette is now W1, W2, 1+, 1-, 2+, 2-, V+, V-, GND;
+  symbols + colors per the agreed scheme — **V+ red, V- blue, GND black (rendered light for
+  contrast), W1/W2 yellow, 1± orange (Ch1), 2± cyan (Ch2)**; added an in-editor M2K pin legend
+  so students map straight from the Lab 1 handout.
+
+**Verification (Definition of Done):**
+- build clean: `tsc && vite build` green (30 modules).
+- Tests: 12/12 pass (W1+Scope1 RC still simulates to ~1 kHz).
+- 12-bit spectrum canary: signal.ts untouched; unaffected.
+
+**State for the next session:**
+- The breadboard vocabulary is M2K-accurate. WIRE-2 still owed: instruments READ from their
+  wired node (direct generateSignal fast path; SPICE .tran through a circuit), and differential
+  ADC reading V(1+) - V(1-). Pairs naturally with DMM-1 (Voltmeter does single-ended + differential).
+
+**Open questions / flags for andre:**
+- ENVIRONMENT (recurring): the mount truncated `schematic.ts` AND `SchematicEditor.tsx` on
+  Edit-tool writes this session; I rewrote both via reliable bash writes and verified
+  tsc/build/tests. **Always run `npm run build` locally before committing these two files.**
+- Color note: GND is the "black" wire but is drawn light-gray so it's visible on the near-black
+  canvas. Say the word if you'd prefer a different GND rendering.
+
+### 2026-06-26 — WIRE-1 Breadboard ports (schematic = patch panel) — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**Decision:** the Circuit editor IS the breadboard. Instrument I/O are ports you place and wire,
+mirroring the M2K bench. (See ROADMAP Track D.)
+
+**What I did:**
+- `src/core/schematic.ts`: new port kinds `awg1`/`awg2` (W1/W2 generator outputs) and
+  `scope1`/`scope2` (Scope CH1/CH2 input probes). `toCircuit` maps them to nets
+  (`awg1`→`in`, `awg2`→`in2`, `scope1`→`out`, `scope2`→`scope2`); AWG ports emit a V source to
+  ground (AC 1). `vsource`/`probe` kept for back-compat. Connectivity warnings reworded.
+- `src/components/SchematicEditor.tsx`: palette now W1/W2/Scope 1/Scope 2 + V+/V- (was V src/
+  Probe/Supply); SVG symbols for the new ports (generator circles, CH1/CH2 probe diamonds).
+- Test: W1+Scope1 RC schematic → engine → -3 dB ~1 kHz.
+
+**Verification (Definition of Done):**
+- build clean: `tsc && vite build` green (30 modules).
+- Tests: 12/12 pass.
+- 12-bit spectrum canary: signal.ts untouched; unaffected.
+
+**State for the next session — WIRE-2 (important):**
+- Today the standalone scope/spectrum STILL read the generator directly; the ports are wired
+  vocabulary + netlist mapping only. WIRE-2 makes each scope/spectrum input read the VOLTAGE AT
+  ITS WIRED NODE: direct fast path (`generateSignal`) when wired straight to a generator (keeps
+  all waveforms + ADC noise), else a SPICE `.tran` of the node. This also completes LOOP-1's
+  scope half (route the circuit transient into `channelInputs.circuitOut`).
+
+**Open questions / flags for andre:**
+- ENVIRONMENT: the mount truncated large files mid-write TWICE today (`SchematicEditor.tsx`,
+  `schematic.ts`). I rebuilt the tails and verified line counts/builds. Recommend confirming
+  `npm run build` locally after pulling. If this keeps happening, prefer smaller edits.
+- Runtime check: open Circuit, place W1 + R + C + Gnd + Scope 1, wire them, press Simulate.
+
+### 2026-06-26 — OSC-2 Second scope channel (CH2) — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**What I did:**
+- `App.tsx`: `setParams2` added; a `signal2` (CH2 = second generator) resolved each tick via the
+  channel bus and passed to the scope; `onParams2Change` lets the scope edit CH2 freq/amplitude.
+- `Oscilloscope.tsx`: CH2 support — enable toggle, per-channel Volts/div + Offset, compact CH2
+  source (freq/amplitude). Switched the y-axis to a **graticule-division** scale (±4 div) so two
+  channels with different Volts/div share one grid, matching Scopy. CH1 orange, CH2 cyan; header
+  + readout show both. `--ch2-color` added to index.css.
+
+**Verification (Definition of Done):**
+- build clean: `tsc && vite build` green (30 modules; index.js ~4.84 MB).
+- Tests: 11/11 pass (capture math unchanged; division mapping is display-only).
+- 12-bit spectrum canary: signal.ts untouched; unaffected.
+
+**State for the next session:**
+- The scope is now two-channel. CH2's source is a second generator; the **circuit-output**
+  source (`circuit-out`) for the full LOOP-1 scope half is still pending wiring (route a
+  `.tran` of the drawn circuit into `channelInputs.circuitOut`, then let the scope select it
+  for CH2). Consider finishing LOOP-1's scope half next, or proceed to Track C.
+- Per andre: **PSU-1 (Power Supply)** and **DMM-1 (Voltmeter)** are queued next — do not skip.
+
+**Open questions / flags for andre:**
+- Runtime check: open Scope, tick "Enable CH2" — a cyan trace appears; adjust CH2 freq/Volts-div
+  independently of CH1. Note the y-axis now reads in divisions (each channel scaled by its V/div).
+
 ### 2026-06-26 — LOOP-1 (Bode half) drawn circuit → Network Analyzer — IN PROGRESS
 
 **By:** Claude Code session (in Cowork)

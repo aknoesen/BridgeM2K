@@ -11,8 +11,17 @@ export type SchKind =
   | 'vsource' // generator input source; terminal 'a' = +, 'b' = -
   | 'opamp'
   | 'ground'
-  | 'probe' // marks the output node ('out')
+  | 'probe' // (legacy) marks the output node ('out') — same as 'scope1'
   | 'dcrail' // DC supply rail (power for active parts); value = volts
+  // Breadboard ports (WIRE-1): instrument I/O placed and wired, named exactly like the M2K.
+  | 'awg1' // W1 — DAC Analog Output 1 → net 'in'
+  | 'awg2' // W2 — DAC Analog Output 2 → net 'in2'
+  | 'scope1' // 1+ — ADC Analog Input 1 Positive → net 'out'
+  | 'adc1n' // 1- — ADC Analog Input 1 Negative (Ch1 reference) → net 'out_n'
+  | 'scope2' // 2+ — ADC Analog Input 2 Positive → net 'scope2'
+  | 'adc2n' // 2- — ADC Analog Input 2 Negative (Ch2 reference) → net 'scope2_n'
+  | 'vplus' // V+ — positive supply (0..+5 V)
+  | 'vminus' // V- — negative supply (0..-5 V)
 
 export interface SchComponent {
   id: string
@@ -61,6 +70,14 @@ export function baseTerminals(kind: SchKind): SchTerminal[] {
     case 'ground':
     case 'probe':
     case 'dcrail':
+    case 'awg1':
+    case 'awg2':
+    case 'scope1':
+    case 'scope2':
+    case 'adc1n':
+    case 'adc2n':
+    case 'vplus':
+    case 'vminus':
       return [{ name: 'p', gx: 0, gy: 0 }]
   }
 }
@@ -122,9 +139,8 @@ export interface ToCircuitResult {
   warnings: string[]
 }
 
-// Convert the schematic to a SPICE-2 Circuit. Net labelling: ground→'0', the V source '+'
-// net→'in', the probe net→'out'. Ground/probe are markers and emit no SPICE device (a single
-// `ground` marker is appended so buildNetlist normalises '0').
+// Convert the schematic to a SPICE-2 Circuit. Net labelling: ground→'0', W1→'in', 1+→'out',
+// 1-→'out_n', etc. Marker ports (ground / scope / probe) emit no SPICE device.
 export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
   const nets = computeNets(s)
   const netOf = (gx: number, gy: number) => nets.get(key(gx, gy)) ?? `net_${gx}_${gy}`
@@ -132,38 +148,54 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
 
   let groundNet: string | undefined
   let inNet: string | undefined
+  let in2Net: string | undefined
   let outNet: string | undefined
+  let outRefNet: string | undefined
+  let scope2Net: string | undefined
+  let scope2RefNet: string | undefined
   for (const c of s.components) {
-    const ts = terminalsOf(c)
-    if (c.kind === 'ground') groundNet = netOf(ts[0].gx, ts[0].gy)
-    if (c.kind === 'probe') outNet = netOf(ts[0].gx, ts[0].gy)
-    if (c.kind === 'vsource') inNet = netOf(ts[0].gx, ts[0].gy)
+    const net = netOf(terminalsOf(c)[0].gx, terminalsOf(c)[0].gy)
+    if (c.kind === 'ground') groundNet = net
+    else if (c.kind === 'probe' || c.kind === 'scope1') outNet = net
+    else if (c.kind === 'adc1n') outRefNet = net
+    else if (c.kind === 'scope2') scope2Net = net
+    else if (c.kind === 'adc2n') scope2RefNet = net
+    else if (c.kind === 'vsource' || c.kind === 'awg1') inNet = net
+    else if (c.kind === 'awg2') in2Net = net
   }
   if (!groundNet) warnings.push('No ground — add a ground symbol.')
-  if (!inNet) warnings.push('No source — add a voltage source (generator input).')
-  if (!outNet) warnings.push('No output probe — mark the output node.')
+  if (!inNet) warnings.push('No source — add a W1 generator output.')
+  if (!outNet) warnings.push('No output — add a Scope CH1 input probe.')
 
   // Connectivity checks: count real (non-marker) component terminals per net.
+  const MARKERS = new Set<SchKind>(['ground', 'probe', 'scope1', 'scope2', 'adc1n', 'adc2n'])
   const termCount = new Map<string, number>()
   for (const c of s.components) {
-    if (c.kind === 'ground' || c.kind === 'probe') continue
+    if (MARKERS.has(c.kind)) continue
     for (const t of terminalsOf(c)) {
-      const n = netOf(t.gx, t.gy)
-      termCount.set(n, (termCount.get(n) ?? 0) + 1)
+      const nn = netOf(t.gx, t.gy)
+      termCount.set(nn, (termCount.get(nn) ?? 0) + 1)
     }
   }
   if (inNet && (termCount.get(inNet) ?? 0) < 2) {
-    warnings.push('Source output (in) is not connected to the rest of the circuit.')
+    warnings.push('W1 output (in) is not connected to the rest of the circuit.')
   }
   if (outNet && (termCount.get(outNet) ?? 0) < 1) {
-    warnings.push('Output node (out) is not connected to any component.')
+    warnings.push('Scope CH1 (out) is not connected to any component.')
   }
 
   const rename = (net: string) =>
-    net === groundNet ? '0' : net === inNet ? 'in' : net === outNet ? 'out' : net
+    net === groundNet ? '0'
+      : net === inNet ? 'in'
+      : net === in2Net ? 'in2'
+      : net === outNet ? 'out'
+      : net === outRefNet ? 'out_n'
+      : net === scope2Net ? 'scope2'
+      : net === scope2RefNet ? 'scope2_n'
+      : net
 
   const comps: SpiceComponent[] = []
-  let rc = 1, cc = 1, lc = 1, vc = 1, ec = 1, sc = 1
+  let rc = 1, cc = 1, lc = 1, vc = 1, ec = 1, sc = 1, aw = 1
   for (const c of s.components) {
     const ts = terminalsOf(c)
     if (c.kind === 'resistor' || c.kind === 'capacitor' || c.kind === 'inductor' || c.kind === 'vsource') {
@@ -173,6 +205,9 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
       else if (c.kind === 'capacitor') comps.push({ kind: 'capacitor', id: String(cc++), nodes: [na, nb], farads: c.value ?? 1e-9 })
       else if (c.kind === 'inductor') comps.push({ kind: 'inductor', id: String(lc++), nodes: [na, nb], henries: c.value ?? 1e-3 })
       else comps.push({ kind: 'vsource', id: String(vc++), nodes: [na, nb], dc: 0, acMag: 1 })
+    } else if (c.kind === 'awg1' || c.kind === 'awg2') {
+      // Generator output port: a V source from its node to ground (AC 1 for sweeps).
+      comps.push({ kind: 'vsource', id: `W${aw++}`, nodes: [rename(netOf(ts[0].gx, ts[0].gy)), '0'], dc: 0, acMag: 1 })
     } else if (c.kind === 'opamp') {
       comps.push({
         kind: 'opamp',
@@ -183,9 +218,11 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
           out: rename(netOf(ts[2].gx, ts[2].gy)),
         },
       })
-    } else if (c.kind === 'dcrail') {
-      comps.push({ kind: 'dcrail', id: `S${sc++}`, node: rename(netOf(ts[0].gx, ts[0].gy)), volts: c.value ?? 5 })
+    } else if (c.kind === 'dcrail' || c.kind === 'vplus' || c.kind === 'vminus') {
+      const def = c.kind === 'vminus' ? -5 : 5
+      comps.push({ kind: 'dcrail', id: `S${sc++}`, node: rename(netOf(ts[0].gx, ts[0].gy)), volts: c.value ?? def })
     }
+    // ground / probe / scope1 (1+) / scope2 (2+) / adc1n (1-) / adc2n (2-) are markers.
   }
   if (groundNet) comps.push({ kind: 'ground', id: '0', node: '0' })
 

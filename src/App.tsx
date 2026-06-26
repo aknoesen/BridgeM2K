@@ -45,7 +45,7 @@ export default function App() {
   const [layout, setLayout] = useState<LayoutMode>('single')
   const [params, setParams] = useState<SignalParams>(DEFAULT_PARAMS)
   // CH2 generator params + channel bus. CH2 has no UI yet (enabled at OSC-2).
-  const [params2] = useState<SignalParams>(DEFAULT_PARAMS2)
+  const [params2, setParams2] = useState<SignalParams>(DEFAULT_PARAMS2)
   const [channels] = useState(DEFAULT_CHANNELS)
   const [running, setRunning] = useState(true)
   // LOOP-1: the drawn circuit lives here so the Schematic editor and the Network Analyzer
@@ -88,6 +88,12 @@ export default function App() {
 
   // CH1 is the existing generator signal; the current instruments consume it unchanged.
   const signal = channelSignals.CH1
+  // CH2 samples for the scope (a second generator), resolved regardless of the bus enable.
+  const signal2 = useMemo(() => {
+    if (!running) return null
+    void tick
+    return resolveChannelSamples({ id: 'CH2', enabled: true, source: { kind: 'generator2' } }, channelInputs)
+  }, [running, channelInputs, tick])
 
   // Convert the drawing to a circuit; sweep it in the Network Analyzer only when valid.
   const drawn = useMemo(() => toCircuit(schematic, 'Drawn circuit'), [schematic])
@@ -175,8 +181,11 @@ export default function App() {
           <Oscilloscope
             params={params}
             signal={signal}
+            signal2={signal2}
+            params2={params2}
             running={running}
             onRunToggle={() => setRunning(r => !r)}
+            onParams2Change={(k, v) => setParams2(prev => ({ ...prev, [k]: v }))}
           />
         ) : layout === 'single' && active === 'schematic' ? (
           <SchematicEditor schematic={schematic} setSchematic={setSchematic} />

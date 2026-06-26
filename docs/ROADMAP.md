@@ -18,7 +18,7 @@ Spec: `docs/specs/oscilloscope.md`
 |-------|-------|-----------|--------|
 | ARCH-1 | Channel bus in App.tsx (CH1/CH2 source abstraction) | — | DONE |
 | OSC-1 | Oscilloscope panel scaffold + timebase + CH1 trace | ARCH-1 | DONE |
-| OSC-2 | Second channel (CH2) + per-channel vertical controls | OSC-1 | TODO |
+| OSC-2 | Second channel (CH2) + per-channel vertical controls | OSC-1 | DONE |
 | OSC-3 | Edge trigger engine (source/level/slope, auto/normal/single) | OSC-2 | TODO |
 | OSC-4 | Holdoff + pulse/width trigger + single-shot capture (parity) | OSC-3 | TODO |
 | OSC-5 | Measurements panel + cursors (Vpp, Vrms, freq, period, duty) | OSC-3 | TODO |
@@ -62,6 +62,27 @@ Notes:
 - PSU rails become DC sources powering active parts (op-amp); the Voltmeter reads a node.
 - Out of scope for now (digital, not needed for EEC1 analog labs): Logic Analyzer, Pattern
   Generator, Digital IO. Revisit only if a course need appears.
+
+## Track D — Breadboard interconnect (wire sources ↔ detectors)
+
+Decision (2026-06-26): the **Circuit editor is the breadboard / patch panel**. Instrument I/O
+are placeable ports wired to the circuit, mirroring the M2K bench (W1/W2 DAC outputs → circuit
+→ scope ADC inputs). **Two-tier resolution** preserves the existing signal pipeline: a scope
+input wired straight to a generator reads the exact `generateSignal` output (all waveforms +
+ADC noise); wired through a circuit it reads a SPICE `.tran` of that node.
+
+| Phase | Title | Depends on | Status |
+|-------|-------|-----------|--------|
+| WIRE-1 | Breadboard ports in the schematic (W1/W2, Scope1/2) + toCircuit net mapping | SCH-1 | DONE |
+| WIRE-2 | Instruments read from their wired node (direct fast path + `.tran`) | WIRE-1, OSC-2 | TODO |
+| WIRE-3 | Non-sine transient drive through a circuit (PULSE/PWL); multi-source | WIRE-2 | TODO |
+
+Notes:
+- WIRE-1 replaced the old "V src"/"Probe" palette items with **W1/W2** (gen outputs) and
+  **Scope 1/Scope 2** (ADC inputs); `dcrail` relabelled **V+/V-**. The model keeps `vsource`/
+  `probe` kinds for back-compat. The Network Analyzer still uses the `in`/`out` nets.
+- WIRE-2 is where the standalone scope/spectrum actually read the node they are wired to
+  (today they still read the generator directly). It also finishes LOOP-1's scope half.
 
 ## Recommended session sequence
 
