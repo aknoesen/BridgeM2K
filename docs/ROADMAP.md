@@ -33,6 +33,7 @@ Spec: `docs/specs/schematic-ngspice.md`
 | SPICE-2 | Circuit graph model + netlist generator (`core/netlist.ts`) | SPICE-1 | DONE |
 | SCH-1 | Browser schematic editor MVP (place/wire R,C,L,V,opamp,gnd) | — | DONE |
 | SCH-2 | Bind editor → circuit graph → netlist | SCH-1, SPICE-2 | DONE |
+| SCH-3 | Save/Load circuit (download/open `.json` + localStorage autosave) | SCH-1 | DONE |
 | NET-1 | Network Analyzer instrument (Bode mag+phase, sine-sweep via ngspice `.ac`) | SPICE-2 | DONE |
 | LOOP-1 | Close the loop: generator → circuit → Network Analyzer (AC Bode) + Scope CH2 (transient) | SCH-2, OSC-2, NET-1 | IN PROGRESS |
 | LOOP-2 | Live value tuning + transient/AC toggle + −3 dB cursor | LOOP-1 | TODO |
@@ -53,7 +54,7 @@ Spec: `docs/specs/schematic-ngspice.md` (these instruments couple to the simulat
 | Phase | Title | Depends on | Status |
 |-------|-------|-----------|--------|
 | PSU-1 | Power Supply instrument — 2 rails (0..+5 V / 0..-5 V), tracking + independent | SPICE-2 | TODO |
-| DMM-1 | Voltmeter instrument — 2-channel AC/DC (±25 V), reads node V via `.op`/RMS | SPICE-2 | TODO |
+| DMM-1 | Voltmeter instrument — 2-channel AC/DC (±25 V), reads node V via `.op`/RMS | SPICE-2 | DONE |
 
 Notes:
 - These mirror real Scopy/M2K instruments (supplies 0..+5 V & 0..-5 V; voltmeter AC/DC ±25 V).
@@ -74,8 +75,8 @@ ADC noise); wired through a circuit it reads a SPICE `.tran` of that node.
 | Phase | Title | Depends on | Status |
 |-------|-------|-----------|--------|
 | WIRE-1 | Breadboard ports in the schematic (W1/W2, Scope1/2) + toCircuit net mapping | SCH-1 | DONE |
-| WIRE-2 | Instruments read from their wired node (direct fast path + `.tran`) | WIRE-1, OSC-2 | TODO |
-| WIRE-3 | Non-sine transient drive through a circuit (PULSE/PWL); multi-source | WIRE-2 | TODO |
+| WIRE-2 | Instruments read from their wired node (direct fast path + `.tran`) | WIRE-1, OSC-2 | DONE |
+| WIRE-3 | Scope/Spectrum read their wired node via `.tran`; non-sine PULSE drive | WIRE-2 | TODO |
 
 Notes:
 - WIRE-1 replaced the old "V src"/"Probe" palette items with **W1/W2** (gen outputs) and

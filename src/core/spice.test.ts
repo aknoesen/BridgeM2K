@@ -47,3 +47,33 @@ describe('transferFunction (Bode)', () => {
     expect(phaseAt1k).toBeLessThan(-40)
   }, 30000)
 })
+
+import { nodeVoltage, hasNode, differentialVoltage } from './spice'
+import { buildNetlist as buildNl } from './netlist'
+import type { Circuit as Ckt } from './netlist'
+
+describe('node voltage (.op) for the Voltmeter', () => {
+  it('reads DC node voltages and a differential', async () => {
+    // V1 in 0 DC 5 ; R1 in->out 1k ; R2 out->0 1k  → V(out)=2.5
+    const ckt: Ckt = {
+      title: 'divider',
+      components: [
+        { kind: 'vsource', id: '1', nodes: ['in', '0'], dc: 5 },
+        { kind: 'resistor', id: '1', nodes: ['in', 'out'], ohms: 1000 },
+        { kind: 'resistor', id: '2', nodes: ['out', '0'], ohms: 1000 },
+        { kind: 'ground', id: '0', node: '0' },
+      ],
+    }
+    const nl = buildNl(ckt, { kind: 'op' })
+    const sim = new Simulation()
+    await sim.start()
+    sim.setNetList(nl)
+    const r = normalizeResult(await sim.runSim())
+    expect(nodeVoltage(r, 'out')).toBeCloseTo(2.5, 3)
+    expect(nodeVoltage(r, 'in')).toBeCloseTo(5, 3)
+    expect(nodeVoltage(r, '0')).toBe(0)
+    expect(hasNode(r, 'out')).toBe(true)
+    expect(hasNode(r, 'nope')).toBe(false)
+    expect(differentialVoltage(r, 'in', 'out')).toBeCloseTo(2.5, 3)
+  }, 30000)
+})

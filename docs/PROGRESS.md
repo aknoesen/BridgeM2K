@@ -36,6 +36,65 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-26 — SCH-3 Save/Load circuit — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**What I did:**
+- `App.tsx`: localStorage autosave/restore of the drawn circuit (`m2k-circuit-v1`) — a refresh
+  or cache-clear no longer loses work. `loadStoredSchematic()` lazy-inits state; an effect
+  persists on every change.
+- `SchematicEditor.tsx`: **Save** (download `m2k-circuit.json`) and **Open** (file picker → parse
+  → load) in the editor header. `bumpIdSeq()` advances the id counter past loaded ids so new
+  parts don't collide. Validates the file shape; status shows "loaded <name>".
+
+**Verification (Definition of Done):**
+- build clean: `tsc && vite build` green.
+- Tests: 13/13 pass (no core math touched).
+- 12-bit spectrum canary: signal.ts untouched; unaffected.
+
+**State for the next session:**
+- Circuits persist across refresh and can be shared/submitted as `.json`. Good for course use.
+- Remaining major items: WIRE-3 (Scope/Spectrum read wired node via `.tran`), PSU-1 (Power
+  Supply instrument), OSC-3..5 (triggers + measurements).
+
+**Open questions / flags for andre:**
+- Runtime check: draw something, Save → a `m2k-circuit.json` downloads; Clear; Open it back.
+  Refresh the page → the last circuit is still there (autosave).
+
+### 2026-06-26 — WIRE-2 analysis-aware sources + DMM-1 Voltmeter — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**What I did:**
+- `core/netlist.ts`: `applyGeneratorParams(circuit, w1, w2)` stamps the Signal Generator
+  settings onto the W1/W2 sources (dc=offset, AC 1, SIN(offset,amp,freq)). `buildNetlist`
+  already switches the emitted line by analysis (AC 1 for `.ac`, SIN for `.tran`, DC for `.op`),
+  so the SAME drawn circuit now drives correctly under every instrument. (schematic.ts untouched.)
+- `core/spice.ts`: `nodeVoltage` / `hasNode` / `differentialVoltage` read a real `.op`/`.dc`
+  result.
+- `components/Voltmeter.tsx` + App "Voltmeter" nav: M2K-style 2-channel DC voltmeter. Runs
+  `.op` on the drawn circuit and shows Ch1 = V(1+)-V(1-), Ch2 = V(2+)-V(2-) — single-ended when
+  the '-' input is on GND, differential otherwise. ±25 V / ±2.5 V ranges with Lab-1 resolution
+  (20 mV / 2 mV).
+
+**Verification (Definition of Done):**
+- build clean: `tsc && vite build` green.
+- **Tests: 13/13 pass.** New: a divider `.op` reads V(out)=2.5 V and a differential = 2.5 V.
+- 12-bit spectrum canary: signal.ts untouched; unaffected.
+
+**State for the next session:**
+- Voltmeter is live and reads the wired ADC ports (Lab 1 Part 4: single-ended + differential
+  supply measurements). Analysis-aware sourcing is proven end to end.
+- Remaining (WIRE-3 / LOOP-1 scope half): make the **Scope/Spectrum** read their wired node via
+  a `.tran` of the circuit (today they still read the generator directly), and add square→PULSE.
+
+**Open questions / flags for andre:**
+- Runtime check: Circuit tab — wire V+ → 1+, 1- → GND, add GND. Open Voltmeter → Ch1 ≈ +5 V.
+  Make it differential by moving 1- to V- and watch Ch1 read the full span.
+
 ### 2026-06-26 — WIRE-1b Exact M2K pin nomenclature + colors — DONE
 
 **By:** Claude Code session (in Cowork)

@@ -167,3 +167,23 @@ export function transferFunction(r: SimResult, outName: string, inName: string):
   }
   return { freq, magDb, phaseDeg }
 }
+
+// ── Node voltage helpers (DMM-1 Voltmeter) ─────────────────────────────────────
+// Read a single node's voltage from a real (.op/.dc) result. Ground / missing → 0.
+export function nodeVoltage(r: SimResult, node: string): number {
+  if (node === '0' || node.toLowerCase() === 'gnd') return 0
+  const i = r.variables.findIndex((v) => v.name.toLowerCase() === `v(${node.toLowerCase()})`)
+  if (i < 0) return 0
+  const col = r.columns[i]
+  return col.kind === 'real' ? col.values[0] : col.mag[0]
+}
+
+// True if the result actually contains this node (i.e. it is wired into the circuit).
+export function hasNode(r: SimResult, node: string): boolean {
+  return r.variables.some((v) => v.name.toLowerCase() === `v(${node.toLowerCase()})`)
+}
+
+// Differential reading V(pos) - V(neg). neg defaults to ground.
+export function differentialVoltage(r: SimResult, pos: string, neg = '0'): number {
+  return nodeVoltage(r, pos) - nodeVoltage(r, neg)
+}

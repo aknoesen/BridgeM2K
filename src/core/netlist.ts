@@ -172,3 +172,18 @@ export function sineFromParams(p: SignalParams): { offset: number; amplitude: nu
 export function makeInputSource(id: string, pos: Net, neg: Net, p: SignalParams): VSource {
   return { kind: 'vsource', id, nodes: [pos, neg], dc: 0, acMag: 1, sine: sineFromParams(p) }
 }
+
+// WIRE-2: stamp the Signal Generator settings onto the W1/W2 source components so the same
+// circuit drives correctly under any analysis (AC 1 for sweeps, SIN(...) for transient, the
+// DC offset for operating point). See docs/specs/schematic-ngspice.md (analysis-aware sources).
+export function applyGeneratorParams(circuit: Circuit, w1?: SignalParams, w2?: SignalParams): Circuit {
+  return {
+    ...circuit,
+    components: circuit.components.map((c) => {
+      if (c.kind !== 'vsource') return c
+      const p = c.id === 'W1' ? w1 : c.id === 'W2' ? w2 : undefined
+      if (!p) return c
+      return { ...c, dc: p.offset, acMag: 1, sine: { offset: p.offset, amplitude: p.amplitude, freq: p.frequency } }
+    }),
+  }
+}

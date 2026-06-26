@@ -55,6 +55,11 @@ function fmtEng(x: number): string {
 
 let idSeq = 1
 const newId = (k: SchKind) => `${k[0].toUpperCase()}${idSeq++}`
+function bumpIdSeq(comps: { id: string }[]) {
+  let max = 0
+  for (const c of comps) { const m = /(\d+)$/.exec(c.id); if (m) max = Math.max(max, Number(m[1])) }
+  idSeq = max + 1
+}
 
 interface EditorProps {
   schematic: Schematic
@@ -63,6 +68,7 @@ interface EditorProps {
 
 export default function SchematicEditor({ schematic, setSchematic }: EditorProps) {
   const svgRef = useRef<SVGSVGElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const sch = schematic
   const setSch = setSchematic
   const [tool, setTool] = useState<Tool>('resistor')
@@ -108,6 +114,40 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
     } finally {
       setSimBusy(false)
     }
+  }
+
+  // SCH-3: save the circuit to a .json file the student can keep / share / submit.
+  function saveCircuit() {
+    const blob = new Blob([JSON.stringify(sch, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'm2k-circuit.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+  function openCircuit(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const d = JSON.parse(String(reader.result))
+        if (Array.isArray(d.components) && Array.isArray(d.wires)) {
+          setSch({ components: d.components, wires: d.wires })
+          bumpIdSeq(d.components)
+          setSelected(null)
+          setSelectedWire(null)
+          setSimStatus('loaded ' + f.name)
+        } else {
+          setSimStatus('not a valid circuit file')
+        }
+      } catch {
+        setSimStatus('could not read circuit file')
+      }
+    }
+    reader.readAsText(f)
+    e.target.value = '' // allow re-loading the same file
   }
 
   // Mouse position → snapped grid coordinates.
@@ -212,7 +252,10 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
             <button className="run-btn active" onClick={simulate} disabled={simBusy}>{simBusy ? 'Simulating…' : '▶ Simulate'}</button>
             <button className="run-btn" onClick={rotate}>Rotate (R)</button>
             <button className="run-btn" onClick={deleteSelected} disabled={!selected && selectedWire === null}>Delete</button>
-            <button className="run-btn" onClick={() => { setSch({ components: [], wires: [] }); setSelected(null) }}>Clear</button>
+            <button className="run-btn" onClick={saveCircuit}>Save</button>
+            <button className="run-btn" onClick={() => fileRef.current?.click()}>Open</button>
+            <button className="run-btn" onClick={() => { setSch({ components: [], wires: [] }); setSelected(null); setSelectedWire(null) }}>Clear</button>
+            <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={openCircuit} />
           </div>
         </div>
         <svg
