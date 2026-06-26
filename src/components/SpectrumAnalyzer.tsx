@@ -126,8 +126,8 @@ export default function SpectrumAnalyzer({
       const [pf, pa] = peakOf(s1)
       setMarkerFreq(pf); setMarkerAmp(pa)
       const traces: Plotly.Data[] = [
-        { x: s1.freq, y: s1.amp, type: 'scatter', mode: 'lines', line: { color: CH1_HEX, width: 1 }, name: 'CH1' },
-        { x: s2.freq, y: s2.amp, type: 'scatter', mode: 'lines', line: { color: CH2_HEX, width: 1 }, name: 'CH2' },
+        { x: s1.freq, y: s1.amp, type: 'scatter', mode: 'lines', line: { color: CH1_HEX, width: 2 }, name: 'CH1' },
+        { x: s2.freq, y: s2.amp, type: 'scatter', mode: 'lines', line: { color: CH2_HEX, width: 2 }, name: 'CH2' },
         { x: [s1.freq[0], s1.freq[s1.freq.length - 1]], y: [s1.noiseFloorDbfs, s1.noiseFloorDbfs],
           type: 'scatter', mode: 'lines', line: { color: '#ff4444', width: 1, dash: 'dot' }, name: `Floor (${bits}-bit)` },
       ]
@@ -202,14 +202,14 @@ export default function SpectrumAnalyzer({
 
     traces.push({
       x: freqDisp, y: ampDisp, type: 'scatter', mode: 'lines',
-      line: { color: showAvg ? `rgba(${liveRgb},0.25)` : liveHex, width: 1 },
+      line: { color: showAvg ? `rgba(${liveRgb},0.25)` : liveHex, width: 2 },
       name: `${chLabel} (live)`,
     })
 
     if (showAvg && avgBufferRef.current) {
       traces.push({
         x: freqDisp, y: avgBufferRef.current, type: 'scatter', mode: 'lines',
-        line: { color: '#44aaff', width: 2 }, name: `Avg (n=${avgCountRef.current})`,
+        line: { color: '#44aaff', width: 2.5 }, name: `Avg (n=${avgCountRef.current})`,
       })
     }
 

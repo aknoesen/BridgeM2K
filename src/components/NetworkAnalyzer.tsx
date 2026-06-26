@@ -152,15 +152,15 @@ export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, pr
     const phaseData: Plotly.Data[] = []
     if (showCh1 && bode1) {
       magData.push({ x: bode1.freq, y: bode1.magDb, type: 'scatter', mode: 'lines', name: 'CH1',
-        line: { color: CH1_COLOR, width: 1.5 }, hoverinfo: 'none' } as Plotly.Data)
+        line: { color: CH1_COLOR, width: 2.5 }, hoverinfo: 'none' } as Plotly.Data)
       phaseData.push({ x: bode1.freq, y: bode1.phaseDeg, type: 'scatter', mode: 'lines', name: 'CH1',
-        line: { color: CH1_COLOR, width: 1.5 }, hoverinfo: 'none' } as Plotly.Data)
+        line: { color: CH1_COLOR, width: 2.5 }, hoverinfo: 'none' } as Plotly.Data)
     }
     if (showCh2 && bode2) {
       magData.push({ x: bode2.freq, y: bode2.magDb, type: 'scatter', mode: 'lines', name: 'CH2',
-        line: { color: CH2_COLOR, width: 1.5 }, hoverinfo: 'none' } as Plotly.Data)
+        line: { color: CH2_COLOR, width: 2.5 }, hoverinfo: 'none' } as Plotly.Data)
       phaseData.push({ x: bode2.freq, y: bode2.phaseDeg, type: 'scatter', mode: 'lines', name: 'CH2',
-        line: { color: CH2_COLOR, width: 1.5 }, hoverinfo: 'none' } as Plotly.Data)
+        line: { color: CH2_COLOR, width: 2.5 }, hoverinfo: 'none' } as Plotly.Data)
     }
 
     const cutoffAnno = cutoff ? [{ x: Math.log10(cutoff), y: magMin + (magMax - magMin) * 0.12,

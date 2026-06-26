@@ -65,7 +65,7 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
     data.push({
       x: tr1.t.map((s) => s * 1000),
       y: tr1.v.map((v) => (v + ch1Offset) / ch1VoltsPerDiv),
-      type: 'scatter', mode: 'lines', line: { color: CH1_COLOR, width: 1.5 },
+      type: 'scatter', mode: 'lines', line: { color: CH1_COLOR, width: 2.5 },
       name: 'CH1', hoverinfo: 'none' as const,
     })
     if (ch2Enabled && signal2) {
@@ -73,7 +73,7 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
       data.push({
         x: tr2.t.map((s) => s * 1000),
         y: tr2.v.map((v) => (v + ch2Offset) / ch2VoltsPerDiv),
-        type: 'scatter', mode: 'lines', line: { color: CH2_COLOR, width: 1.5 },
+        type: 'scatter', mode: 'lines', line: { color: CH2_COLOR, width: 2.5 },
         name: 'CH2', hoverinfo: 'none' as const,
       })
     }

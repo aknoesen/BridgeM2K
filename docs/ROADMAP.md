@@ -143,6 +143,26 @@ Decisions (locked with andre, 2026-06-26):
 - Prioritised **next** ahead of OSC-3/LOOP-2 at andre's direction — it bridges the Lab 1/2 gap
   (ideal schematic → physical bench). None of Track F touches `core/signal.ts`.
 
+## Track G — iio-emu / real-Scopy integration (andre, 2026-06-26, post-AD meeting)
+
+Spec: `docs/specs/iio-scopy.md`
+
+| Phase | Title | Depends on | Status |
+|-------|-------|-----------|--------|
+| G-A | Fidelity alignment: match the twin's params/names to AD's `adalm2000.xml` + ADC/DAC source | — | TODO |
+| G-B | SPICE-in-the-loop with **real Scopy** via iio-emu generic mode (bridge: TX file → ngspice → RX file) | G-A, SCH-2 | TODO |
+| G-C | (Long horizon, parked) browser twin speaks IIO via a libiio-over-WebSocket bridge | G-B | TODO |
+
+Notes:
+- **Complementary native path, not a pivot.** The browser twin stays the zero-install student tool;
+  Track G adds a lab/pro mode + the AD-facing showcase (real Scopy displaying a SPICE-simulated circuit).
+- **G-A is cheap and browser-only** — pull AD's authoritative M2K numbers (sample rate, 12-bit
+  scaling, ±range, channel names/scan formats) from `iiod/context/adalm2000/adalm2000.xml` +
+  `m2k_adc.cpp`/`m2k_dac.cpp` and reconcile with the twin's constants. Do it next; high credibility.
+- **G-B is the headline demo** but native/install-heavy (iio-emu + Scopy + a bridge running ngspice);
+  schedule deliberately, de-risk with a plain loopback first.
+- ADIBSD-licensed (permissive). None of Track G touches `core/signal.ts`.
+
 ## Recommended session sequence
 
 A reasonable single-developer (single CC session per row) order:

@@ -50,7 +50,7 @@ export default function SignalGenerator({ params, signal, running, compact, onPa
       y: xDisp,
       type: 'scatter' as const,
       mode: 'lines' as const,
-      line: { color: 'var(--ch1-color)', width: 1.5 },
+      line: { color: 'var(--ch1-color)', width: 2.5 },
       name: 'W1',
     }
 
