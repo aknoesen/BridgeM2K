@@ -121,6 +121,28 @@ Notes:
   ("I lost my Spectrum panel"). E-1 presets may be the right stopping point for the course.
 - None of Track E touches `core/signal.ts`; the 12-bit canary must hold throughout.
 
+## Track F — Breadboard layout (schematic → bench transfer)  ← NEXT (andre, 2026-06-26)
+
+Spec: `docs/specs/breadboard.md`
+
+| Phase | Title | Depends on | Status |
+|-------|-------|-----------|--------|
+| F-1 | Breadboard model + parametric SVG render + Practice-mode net colouring | SCH-1 | TODO |
+| F-2 | Drag 2-pin parts from schematic + jumpers + verification loop (board ≟ schematic) | F-1 | TODO |
+| F-3 | (Stretch) DIP/IC footprints (op-amp, INA) + optional "show one valid layout" hint | F-2 | TODO |
+
+Decisions (locked with andre, 2026-06-26):
+- **Verification loop is the centerpiece** — Check tells the student if their board is electrically
+  the schematic, with per-connection feedback. Reuses `computeNets` on both sides.
+- **Parametric SVG board** (not a photo): regular geometry, exact hole coords, theme-able, no
+  licensing/alignment.
+- **Two modes:** *Practice* (live net colouring, default) and *Bench/Exam* (no hints; place from
+  your own mental model, then Check — the "sneaky"/realistic mode + graded transfer).
+- **Drag from the schematic** (parts keep id/value), **stacked view** (schematic on top, board
+  below — NOT side-by-side), **2-pin parts first** (DIP in F-3).
+- Prioritised **next** ahead of OSC-3/LOOP-2 at andre's direction — it bridges the Lab 1/2 gap
+  (ideal schematic → physical bench). None of Track F touches `core/signal.ts`.
+
 ## Recommended session sequence
 
 A reasonable single-developer (single CC session per row) order:

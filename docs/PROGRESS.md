@@ -36,6 +36,29 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-26 — Planning: Track F (breadboard layout) specced + prioritised NEXT — DONE (docs only)
+
+**By:** Claude Code session (in Cowork) — project-director planning, no code
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**What I did:**
+- New spec `docs/specs/breadboard.md` for **Track F** — transfer a schematic onto a solderless
+  breadboard, student makes the layout choices, twin verifies electrical equivalence.
+- Locked decisions: **verification loop is the centerpiece** (reuse `computeNets` on both sides,
+  per-connection feedback); **parametric SVG board** (not a photo); **Practice mode** (live net
+  colouring) with a toggle to **Bench mode** (no hints → place from memory, then Check — the
+  sneaky/graded mode); **drag from the schematic**; **stacked view** (board under schematic, not
+  side-by-side); **2-pin parts first**, DIP/IC in F-3.
+- Phases: F-1 board model + SVG render + net colouring; F-2 drag parts + jumpers + equivalence
+  check; F-3 (stretch) DIPs + hint.
+- ROADMAP: added Track F block, marked **NEXT** ahead of OSC-3/LOOP-2 per andre.
+
+**Verification:** docs only; no build/test impact. `signal.ts` untouched.
+
+**State for the next session:**
+- **Take F-1 next.** It bridges the Lab 1/2 gap (ideal schematic → physical bench). Reuses the
+  existing `computeNets` net engine; no new dependency. Still open after F: OSC-3, LOOP-2, Track E, KICAD-1.
+
 ### 2026-06-26 — Spectrum Analyzer: CH1 / CH2 / Both channel select — DONE
 
 **By:** Claude Code session (in Cowork)
