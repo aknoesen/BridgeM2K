@@ -46,7 +46,9 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
   dropdown in the Circuit editor header. Each has a W1 source, a 1+ (CH1) probe on the output, and
   grounds, so it runs immediately in the Network Analyzer / scope.
 - Set (grouped Passive / Amplifiers): voltage divider (÷2), RC low-pass, RC high-pass, LC low-pass,
-  LC high-pass, inverting amp ×−2.2 (ideal + LMC662), non-inverting amp ×2 (ideal + LMC662).
+  LC high-pass, RLC band-pass (~1.6 kHz, Q≈7), inverting amp ×−2.2 (ideal + LMC662), non-inverting
+  amp ×2 (ideal + LMC662), op-amp integrator, op-amp differentiator, and a 2-input summing amp
+  (W1+W2). 13 circuits total.
 - The amp pairs share one skeleton parameterised by op-amp model: "ideal" = kind 'opamp' with no
   rails (sim-only); "LMC662" = same with `opModel:'lmc662'` plus V+/V- rail parts — so the pair
   also demonstrates the sim-only vs sim+build distinction. Gains kept small (≈2) so they don't clip

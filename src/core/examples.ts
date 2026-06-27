@@ -174,4 +174,98 @@ export const EXAMPLES: Example[] = [
     blurb: 'Real LMC662 (needs ±5 V rails). Same gain; shows bandwidth + clipping.',
     schematic: nonInvertingAmp(true),
   },
+  {
+    id: 'rlc-bandpass', name: 'RLC band-pass (~1.6 kHz)', group: 'Passive',
+    blurb: 'Series L-C with output across R. Peaks at resonance (Q ≈ 7).',
+    schematic: {
+      components: [
+        { id: 'W1', kind: 'awg1', gx: 2, gy: 4 },
+        { id: 'L1', kind: 'inductor', gx: 4, gy: 4, value: 0.1 },
+        { id: 'C1', kind: 'capacitor', gx: 6, gy: 4, value: 1e-7 },
+        { id: 'R1', kind: 'resistor', gx: 8, gy: 4, rotation: 1, value: 100 },
+        { id: 'G1', kind: 'ground', gx: 8, gy: 6 },
+        { id: 'P1', kind: 'scope1', gx: 10, gy: 4 },
+      ],
+      wires: [
+        { x1: 2, y1: 4, x2: 4, y2: 4 },   // W1 -> L.a
+        { x1: 8, y1: 4, x2: 10, y2: 4 },  // node (across R) -> 1+
+      ],
+    },
+  },
+  {
+    id: 'integrator', name: 'Integrator (op-amp)', group: 'Amplifiers',
+    blurb: 'Inverting integrator (Rf bounds DC gain). −20 dB/decade above ~70 Hz.',
+    schematic: {
+      components: [
+        { id: 'W1', kind: 'awg1', gx: 2, gy: 6 },
+        { id: 'Rin', kind: 'resistor', gx: 4, gy: 6, value: 10000 },
+        { id: 'U1', kind: 'opamp', gx: 10, gy: 4 },
+        { id: 'Cf', kind: 'capacitor', gx: 10, gy: 8, value: 1e-7 },
+        { id: 'Rf', kind: 'resistor', gx: 10, gy: 10, value: 22000 },
+        { id: 'G1', kind: 'ground', gx: 8, gy: 4 },
+        { id: 'P1', kind: 'scope1', gx: 16, gy: 5 },
+      ],
+      wires: [
+        { x1: 2, y1: 6, x2: 4, y2: 6 },    // W1 -> Rin.a
+        { x1: 6, y1: 6, x2: 10, y2: 6 },   // Rin.b -> inN
+        { x1: 10, y1: 4, x2: 8, y2: 4 },   // inP -> ground
+        { x1: 10, y1: 6, x2: 10, y2: 8 },  // inN -> Cf.a
+        { x1: 10, y1: 8, x2: 10, y2: 10 }, // Cf.a -> Rf.a (parallel feedback)
+        { x1: 12, y1: 8, x2: 12, y2: 10 }, // Cf.b -> Rf.b
+        { x1: 14, y1: 5, x2: 14, y2: 8 },  // out -> down
+        { x1: 14, y1: 8, x2: 12, y2: 8 },  // -> feedback (out side)
+        { x1: 14, y1: 5, x2: 16, y2: 5 },  // out -> 1+
+      ],
+    },
+  },
+  {
+    id: 'differentiator', name: 'Differentiator (op-amp)', group: 'Amplifiers',
+    blurb: 'Inverting differentiator. +20 dB/decade (0 dB near 160 Hz).',
+    schematic: {
+      components: [
+        { id: 'W1', kind: 'awg1', gx: 2, gy: 6 },
+        { id: 'Cin', kind: 'capacitor', gx: 4, gy: 6, value: 1e-7 },
+        { id: 'U1', kind: 'opamp', gx: 10, gy: 4 },
+        { id: 'Rf', kind: 'resistor', gx: 10, gy: 8, value: 10000 },
+        { id: 'G1', kind: 'ground', gx: 8, gy: 4 },
+        { id: 'P1', kind: 'scope1', gx: 16, gy: 5 },
+      ],
+      wires: [
+        { x1: 2, y1: 6, x2: 4, y2: 6 },    // W1 -> Cin.a
+        { x1: 6, y1: 6, x2: 10, y2: 6 },   // Cin.b -> inN
+        { x1: 10, y1: 4, x2: 8, y2: 4 },   // inP -> ground
+        { x1: 10, y1: 6, x2: 10, y2: 8 },  // inN -> Rf.a
+        { x1: 14, y1: 5, x2: 14, y2: 8 },  // out -> down
+        { x1: 14, y1: 8, x2: 12, y2: 8 },  // -> Rf.b (feedback)
+        { x1: 14, y1: 5, x2: 16, y2: 5 },  // out -> 1+
+      ],
+    },
+  },
+  {
+    id: 'summing', name: 'Summing amp (W1 + W2)', group: 'Amplifiers',
+    blurb: 'Inverting summer: out = −(W1 + W2). Drive both generators, see the sum on the scope.',
+    schematic: {
+      components: [
+        { id: 'W1', kind: 'awg1', gx: 2, gy: 6 },
+        { id: 'Ra', kind: 'resistor', gx: 6, gy: 6, value: 10000 },
+        { id: 'W2', kind: 'awg2', gx: 2, gy: 8 },
+        { id: 'Rb', kind: 'resistor', gx: 6, gy: 8, value: 10000 },
+        { id: 'U1', kind: 'opamp', gx: 10, gy: 4 },
+        { id: 'Rf', kind: 'resistor', gx: 10, gy: 10, value: 10000 },
+        { id: 'G1', kind: 'ground', gx: 8, gy: 4 },
+        { id: 'P1', kind: 'scope1', gx: 16, gy: 5 },
+      ],
+      wires: [
+        { x1: 2, y1: 6, x2: 6, y2: 6 },    // W1 -> Ra.a
+        { x1: 8, y1: 6, x2: 10, y2: 6 },   // Ra.b -> inN
+        { x1: 2, y1: 8, x2: 6, y2: 8 },    // W2 -> Rb.a
+        { x1: 8, y1: 8, x2: 8, y2: 6 },    // Rb.b -> summing node (Ra.b)
+        { x1: 10, y1: 4, x2: 8, y2: 4 },   // inP -> ground
+        { x1: 10, y1: 6, x2: 10, y2: 10 }, // inN -> Rf.a
+        { x1: 14, y1: 5, x2: 14, y2: 10 }, // out -> down
+        { x1: 14, y1: 10, x2: 12, y2: 10 },// -> Rf.b (feedback)
+        { x1: 14, y1: 5, x2: 16, y2: 5 },  // out -> 1+
+      ],
+    },
+  },
 ]
