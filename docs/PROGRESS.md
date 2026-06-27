@@ -36,6 +36,27 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-27 — Oscilloscope XY mode — DONE
+
+**By:** Claude Code session
+**Commit:** uncommitted
+
+**What I did:**
+- `Oscilloscope.tsx`: an **XY** toggle (header, next to Run) that plots CH1 on X vs CH2 on Y
+  instead of both against time. The XY toggle auto-enables CH2 (XY needs both channels).
+- Pairs the captured CH1/CH2 window sample-by-sample, scales each onto the shared division grid
+  with per-channel Volts/div + offset, and renders a square plot (yaxis `scaleanchor:'x'`) so
+  shapes aren't distorted. Measurements row still updates.
+- Use: for an I-V curve put device voltage on CH1 (1+) and current on CH2 (2+, via a sense
+  resistor → V/R); for Lissajous feed two sines. Mirrors Scopy's XY.
+
+**Verification (Definition of Done):**
+- build clean: yes — `tsc --noEmit` zero errors.
+- 12-bit floor: unaffected (no `signal.ts` change).
+- math sanity check: N/A (display mode). Manual: enable XY, drive CH1/CH2 with two sines → a
+  Lissajous ellipse; a resistor I-V gives a straight line whose slope is 1/R.
+
+
 ### 2026-06-27 — Schematic editor: undo/redo + copy/paste/cut — DONE
 
 **By:** Claude Code session

@@ -100,6 +100,7 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
   const [cx2, setCx2] = useState(8) // time cursor 2 (display units)
   const [cy1, setCy1] = useState(1) // voltage cursor 1 (divisions)
   const [cy2, setCy2] = useState(-1) // voltage cursor 2 (divisions)
+  const [xyMode, setXyMode] = useState(false) // plot CH1 (X) vs CH2 (Y) — I-V curves & Lissajous
 
   // Display-unit handling: short windows read in ms, long ones (≥1 s) in seconds.
   const windowSec = SCOPE_H_DIVS * timePerDiv
@@ -180,6 +181,41 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
 
     const data: Plotly.Data[] = []
     const tr1 = captureWindow(ch1src, Fs, timePerDiv, offsetSec)
+
+    // ── XY mode: plot CH1 (X) vs CH2 (Y) instead of both vs time. Great for I-V curves (X = device
+    // voltage, Y = current via a sense resistor) and Lissajous figures. Both channels scaled onto
+    // the same division grid with a square aspect so shapes aren't distorted.
+    if (xyMode && ch2src) {
+      const tr2 = captureWindow(ch2src, Fs, timePerDiv, offsetSec)
+      const n = Math.min(tr1.v.length, tr2.v.length)
+      const xs = new Array(n), ys = new Array(n)
+      for (let i = 0; i < n; i++) {
+        xs[i] = (tr1.v[i] + ch1Offset) / ch1VoltsPerDiv
+        ys[i] = (tr2.v[i] + ch2Offset) / ch2VoltsPerDiv
+      }
+      const winSamples = Math.round(windowSec * Fs)
+      const startIdx = Math.max(0, Math.round(offsetSec * Fs))
+      setMeas1(measureTrace(ch1src.x.subarray(startIdx, startIdx + winSamples), 1 / Fs))
+      setMeas2(measureTrace(ch2src.x.subarray(startIdx, startIdx + winSamples), 1 / Fs))
+      const xyLayout: Partial<Plotly.Layout> = {
+        paper_bgcolor: 'var(--bg-display)', plot_bgcolor: 'var(--bg-display)',
+        font: { color: 'var(--text-primary)', size: 11 },
+        margin: { l: 48, r: 16, t: 24, b: 44 }, showlegend: false,
+        xaxis: { title: { text: 'CH1 → X (div)', font: { size: 11 } }, range: [-half, half], dtick: 1,
+          gridcolor: '#2a2a2a', zerolinecolor: '#666', tickfont: { size: 10 }, color: 'var(--text-secondary)' },
+        yaxis: { title: { text: 'CH2 → Y (div)', font: { size: 11 } }, range: [-half, half], dtick: 1,
+          scaleanchor: 'x', scaleratio: 1,
+          gridcolor: '#2a2a2a', zerolinecolor: '#666', tickfont: { size: 10 }, color: 'var(--text-secondary)' },
+      }
+      const xyData: Plotly.Data[] = [{
+        x: xs, y: ys, type: 'scatter', mode: 'lines', line: { color: '#9b7fff', width: 2 }, hoverinfo: 'none' as const,
+      }]
+      const xyConfig: Partial<Plotly.Config> = { displayModeBar: false, responsive: true }
+      if (!initialised.current) { Plotly.newPlot(el, xyData, xyLayout, xyConfig); initialised.current = true }
+      else Plotly.react(el, xyData, xyLayout, xyConfig)
+      return
+    }
+
     data.push({
       x: tr1.t.map((s) => s * tScale),
       y: tr1.v.map((v) => (v + ch1Offset) / ch1VoltsPerDiv),
@@ -238,7 +274,7 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
   }, [ch1src, ch2src, srcFs, ch2Enabled, timePerDiv, ch1VoltsPerDiv, ch1Offset, ch2VoltsPerDiv, ch2Offset,
       trigSource, trigLevel, trigSlope, trigMode, singleArmed, running,
       trigType, pulsePolarity, pulseWidthMode, pulseWidthMs, holdoffMs,
-      showCursors, cx1, cx2, cy1, cy2, tScale, tUnit, windowDisp, windowSec])
+      showCursors, cx1, cx2, cy1, cy2, tScale, tUnit, windowDisp, windowSec, xyMode])
 
   const statusColor = trigStatus.startsWith('Trig') ? TRIG_COLOR : trigStatus === 'Auto' ? '#88dd88' : 'var(--text-secondary)'
 
@@ -258,6 +294,10 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
             )}
           </span>
           <div className="display-controls">
+            <button className={`run-btn ${xyMode ? 'active' : ''}`} title="XY mode: plot CH1 (X) vs CH2 (Y) — I-V curves & Lissajous"
+              onClick={() => { const on = !xyMode; setXyMode(on); if (on && !ch2Enabled) setCh2Enabled(true) }}>
+              {xyMode ? 'YT' : 'XY'}
+            </button>
             <button className={`run-btn ${running ? 'active' : ''}`} onClick={onRunToggle}>
               {running ? '⏹ Stop' : '▶ Run'}
             </button>
