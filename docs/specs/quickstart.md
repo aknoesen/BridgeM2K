@@ -43,7 +43,30 @@ editor opens on the Select tool), so "load X, open Y, read Z" is reliable.
 - Step buttons load the divider and navigate; Voltmeter then reads ≈5 V (applied) / ≈2.5 V (midpoint).
 - `tsc` clean; 12-bit canary unaffected (no `core/` changes).
 
-## Future (not this phase)
+## Done in QS-1 follow-up
 
-- QS-2: per-instrument tour + figures/screenshots.
-- Hook Lab prelab `<!-- TWIN: -->` markers (see CLAUDE.md) to deep-link the relevant Quickstart step.
+- Single-ended vs differential measurement: illustrated SVG section in the intro (measure one supply
+  vs measure across both), placed before the Lab 1 walkthrough — students must get this subtlety early.
+- "Return to Quickstart" affordance: once opened, the Quickstart nav button gold-pulses whenever the
+  user is on another panel (its steps send you elsewhere), so the way back is always obvious
+  (`.nav-hint` in `App.css`, `quickstartSeen` in `App.tsx`).
+
+## QS-2 — guided instrument sequence (next, planned with andre 2026-06-27)
+
+Continue the same load-then-look flow through the natural lab order after the Voltmeter:
+
+1. **Signal Generator + Oscilloscope.** Drive W1, view it on the scope in normal **time-base (YT)**
+   first. Then introduce **XY mode** — the **Zener I-V** example is the showcase (sweep, see the
+   forward knee + reverse breakdown). Step buttons: load example, open scope, toggle YT→XY.
+2. **Network Analyzer + digitization.** Explain what the user is presented with (mag/phase Bode
+   sweep) AND the digitization story: the 12-bit ADC, and **what dBFS means** (decibels relative to
+   full-scale: 0 dBFS = ADC full scale = ±2.5 V here; the noise floor sits ~−104 dBFS at 12-bit).
+   Likely needs a small explanatory diagram of full-scale → dBFS and the quantization floor. Tie to
+   the Spectrum Analyzer's Learning Mode (bit-depth comparison) which already teaches this.
+3. **Circuit/simulation → board.** Explain the transfer: draw + simulate the circuit, then move it to
+   the Breadboard view and use Check to verify the physical layout matches the schematic
+   (Practice vs Bench modes). Bridges Lab 1/2 (ideal schematic → physical bench).
+
+Out of scope still: video, screenshots of real Scopy. Keep diagrams as inline themed SVG.
+
+- Also: hook Lab prelab `<!-- TWIN: -->` markers (see CLAUDE.md) to deep-link the relevant step.

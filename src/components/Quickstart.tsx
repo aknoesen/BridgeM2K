@@ -70,6 +70,60 @@ export default function Quickstart({ onGoTo, onLoadExample }: Props) {
             load on W1/W2 sags here exactly as it would on the bench.
           </p>
 
+          <h3 style={h3}>Single-ended vs differential — read this twice</h3>
+          <p style={{ marginTop: 0 }}>
+            Every voltmeter and scope channel has <b>two</b> inputs, a{' '}
+            <b style={{ color: 'var(--ch1-color)' }}>+</b> and a <b style={{ color: '#40c0e0' }}>−</b>,
+            and both <b>float</b>: neither is ground until you wire it that way. Where you put the −
+            lead decides which of two very different measurements you get.
+          </p>
+          <div style={card}>
+            <svg viewBox="0 0 760 252" style={{ width: '100%', height: 'auto' }} role="img"
+              aria-label="Left: single-ended measurement with the minus lead tied to ground reads one node relative to zero volts. Right: differential measurement with plus and minus across two live nodes reads their difference.">
+              <line x1="380" y1="14" x2="380" y2="238" stroke="var(--border)" strokeWidth="1" />
+
+              {/* ── Single-ended ── */}
+              <text x="24" y="28" fill="var(--text-primary)" fontSize="15" fontWeight="700">Single-ended</text>
+              <text x="24" y="46" fill="var(--text-secondary)" fontSize="12">− lead tied to GROUND</text>
+              <circle cx="70" cy="150" r="4" fill="var(--text-primary)" />
+              <text x="18" y="176" fill="var(--text-primary)" fontSize="12">node = −5 V</text>
+              <line x1="70" y1="150" x2="225" y2="150" stroke="var(--ch1-color)" strokeWidth="2.5" />
+              <text x="140" y="142" fill="var(--ch1-color)" fontSize="12" fontWeight="700">1+</text>
+              <circle cx="255" cy="150" r="30" fill="var(--bg-panel)" stroke="var(--text-secondary)" strokeWidth="2" />
+              <text x="255" y="157" fill="var(--text-primary)" fontSize="18" fontWeight="700" textAnchor="middle">V</text>
+              <line x1="255" y1="180" x2="255" y2="204" stroke="#40c0e0" strokeWidth="2.5" />
+              <text x="264" y="197" fill="#40c0e0" fontSize="12" fontWeight="700">1−</text>
+              <line x1="243" y1="206" x2="267" y2="206" stroke="var(--text-secondary)" strokeWidth="2" />
+              <line x1="247" y1="211" x2="263" y2="211" stroke="var(--text-secondary)" strokeWidth="2" />
+              <line x1="251" y1="216" x2="259" y2="216" stroke="var(--text-secondary)" strokeWidth="2" />
+              <text x="298" y="156" fill="var(--ch1-color)" fontSize="15" fontWeight="700">= −5 V</text>
+              <text x="24" y="234" fill="var(--text-secondary)" fontSize="11.5">One node measured against 0 V.</text>
+
+              {/* ── Differential ── */}
+              <text x="404" y="28" fill="var(--text-primary)" fontSize="15" fontWeight="700">Differential</text>
+              <text x="404" y="46" fill="var(--text-secondary)" fontSize="12">+ and − across two live nodes</text>
+              <circle cx="470" cy="112" r="4" fill="var(--text-primary)" />
+              <text x="414" y="116" fill="var(--text-primary)" fontSize="12">+5 V</text>
+              <circle cx="470" cy="182" r="4" fill="var(--text-primary)" />
+              <text x="414" y="186" fill="var(--text-primary)" fontSize="12">−5 V</text>
+              <line x1="470" y1="112" x2="626" y2="136" stroke="var(--ch1-color)" strokeWidth="2.5" />
+              <line x1="470" y1="182" x2="626" y2="164" stroke="#40c0e0" strokeWidth="2.5" />
+              <text x="545" y="120" fill="var(--ch1-color)" fontSize="12" fontWeight="700">1+</text>
+              <text x="545" y="182" fill="#40c0e0" fontSize="12" fontWeight="700">1−</text>
+              <circle cx="656" cy="150" r="30" fill="var(--bg-panel)" stroke="var(--text-secondary)" strokeWidth="2" />
+              <text x="656" y="157" fill="var(--text-primary)" fontSize="18" fontWeight="700" textAnchor="middle">V</text>
+              <text x="656" y="212" fill="#40c0e0" fontSize="15" fontWeight="700" textAnchor="middle">= +10 V</text>
+              <text x="404" y="234" fill="var(--text-secondary)" fontSize="11.5">The difference: 5 − (−5) = 10 V. No ground needed.</text>
+            </svg>
+          </div>
+          <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 10 }}>
+            Same two probes, different wiring. Measuring the −5 V supply against ground reads <b>−5 V</b>
+            (single-ended); putting + on +5 V and − on −5 V reads the <b>10 V</b> span across both
+            supplies (differential) — a number no single-ended reading gives you. In this app you choose
+            by where the <b>1−</b> probe lands: on ground, or on another node. The diode I-V example uses a
+            differential pair to read the voltage <i>across</i> the diode, which has neither end at ground.
+          </p>
+
           <h3 style={h3}>Your first measurement — a voltage divider (Lab 1)</h3>
           <p style={{ marginTop: 0 }}>
             The Lab 1 pairing is the <b>Power Supply</b> and the <b>Voltmeter</b>: set a DC voltage,

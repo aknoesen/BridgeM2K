@@ -91,6 +91,10 @@ export default function App() {
   })()
   // `presetId` null → single-instrument view of `active`; otherwise a multi-panel preset.
   const [active, setActive] = useState<ActiveInstrument>(stored0.active ?? 'siggen')
+  // Once the user has opened the Quickstart, gold-highlight its nav button whenever they are
+  // elsewhere, so the way back to the guide is always obvious (its steps send you to other panels).
+  const [quickstartSeen, setQuickstartSeen] = useState(false)
+  useEffect(() => { if (active === 'quickstart') setQuickstartSeen(true) }, [active])
   const [presetId, setPresetId] = useState<string | null>(stored0.presetId ?? null)
   const [entered, setEntered] = useState<boolean>(() => {
     try { return localStorage.getItem('bm2k-welcomed') === '1' } catch { return false }
@@ -335,8 +339,8 @@ export default function App() {
   const arrange: Arrange = preset ? preset.arrange : 'single'
   const multi = panels.length > 1
 
-  const navBtn = (id: ActiveInstrument, icon: string, label: React.ReactNode, title: string) => (
-    <button className={`nav-btn ${active === id && !presetId ? 'nav-active' : ''}`}
+  const navBtn = (id: ActiveInstrument, icon: string, label: React.ReactNode, title: string, hint = false) => (
+    <button className={`nav-btn ${active === id && !presetId ? 'nav-active' : ''} ${hint ? 'nav-hint' : ''}`}
       onClick={() => { setActive(id); setPresetId(null) }} title={title}>
       <span className="nav-icon">{icon}</span><span className="nav-label">{label}</span>
     </button>
@@ -418,7 +422,7 @@ export default function App() {
     <div className="app-shell">
       <nav className="nav-panel">
         <div className="nav-logo" onClick={() => setEntered(false)} title="Welcome" style={{ cursor: 'pointer' }}><img src={`${import.meta.env.BASE_URL}bridgem2k.svg`} alt="BridgeM2K" style={{ width: 48, height: 48, display: "block", margin: "0 auto" }} /></div>
-        {navBtn('quickstart', '▷', <>Quick<br/>start</>, 'Quickstart — new here? Start with this')}
+        {navBtn('quickstart', '▷', <>Quick<br/>start</>, 'Quickstart — new here? Start with this', quickstartSeen && active !== 'quickstart' && !presetId)}
         {navBtn('siggen', '⌇', <>Signal<br/>Gen</>, 'Signal Generator')}
         {navBtn('scope', '∿', 'Scope', 'Oscilloscope')}
         {navBtn('spectrum', '▲', 'Spectrum', 'Spectrum Analyzer')}

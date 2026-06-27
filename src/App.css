@@ -56,6 +56,22 @@
   color: var(--accent-blue);
 }
 
+/* Quickstart "come back here" hint: gold-highlighted once the guide has been opened and the
+   user has navigated away (its steps send you to other panels). Gentle pulse to draw the eye. */
+.nav-btn.nav-hint {
+  color: #ffbf00;
+  border-color: #ffbf00;
+  background: rgba(255, 191, 0, 0.12);
+  animation: nav-hint-pulse 1.8s ease-in-out infinite;
+}
+@keyframes nav-hint-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 191, 0, 0.0); }
+  50%      { box-shadow: 0 0 10px 1px rgba(255, 191, 0, 0.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-btn.nav-hint { animation: none; }
+}
+
 .nav-icon {
   font-size: 18px;
   line-height: 1;

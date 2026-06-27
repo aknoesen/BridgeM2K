@@ -173,7 +173,7 @@ Spec: `docs/specs/quickstart.md`
 | Phase | Title | Depends on | Status |
 |-------|-------|-----------|--------|
 | QS-1 | In-app Quickstart panel (nav button + Welcome link): M2K↔app bridge + Lab 1 walkthrough (divider on Power Supply + Voltmeter), with step buttons that load examples and jump to instruments | examples.ts | DONE |
-| QS-2 | (Future) Full per-instrument tour + figures/screenshots; hook Lab prelab `<!-- TWIN: -->` markers | QS-1 | TODO |
+| QS-2 | Guided instrument sequence after the Voltmeter: Signal Gen + Scope (YT then XY, Zener I-V showcase) → Network Analyzer + digitization/dBFS explainer → circuit/sim → board transfer. See spec. | QS-1 | TODO |
 
 Notes:
 - **Goal:** get a general (non-CC) user going. Open an example → see it framed → understand
