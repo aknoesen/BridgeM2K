@@ -166,6 +166,34 @@ Notes:
   schedule deliberately, de-risk with a plain loopback first.
 - ADIBSD-licensed (permissive). None of Track G touches `core/signal.ts`.
 
+## Track H — Onboarding / in-app Quickstart  ← requested (andre, 2026-06-27)
+
+No spec yet — write `docs/specs/quickstart.md` when QS-1 is picked up.
+
+| Phase | Title | Depends on | Status |
+|-------|-------|-----------|--------|
+| QS-1 | In-app Quickstart doc, reachable from the app (nav button / Welcome link), that walks a new user through the bench using the built-in example library to illustrate each instrument | examples.ts | TODO |
+
+Notes:
+- **Goal:** get a general (non-CC) user going. Open an example → see it framed → understand
+  what each instrument shows. Lean on the now-deterministic examples (each presets its
+  generators + Volts/div and resets the tool to Select), so the doc can say "load X, press Run,
+  read Y" and it just works.
+- **Suggested arc** (matches the actual EEC1 instrument-introduction order from Lab1Instructions.md
+  §1.1: Power supply + Voltmeter = Lab 1, Spectrum = Lab 3, Scope + Function generator = Lab 4,
+  Network analyzer = Lab 5): Voltage divider on the **Power Supply + Voltmeter** (Lab 1 worked
+  example — set V+, read applied vs midpoint single-ended; mention the differential measurement
+  too, per Lab 1 §4) → **Signal Generator (W1/W2) + Oscilloscope** → **Spectrum analyzer** →
+  **Network analyzer** (RC/RL filters, Bode) → op-amp examples → I-V curves (XY) → breadboard transfer.
+- **Start material (now connected):** andre's `Lab1Instructions.md` at
+  `C:\Users\aknoesen\Documents\Knoesen\EEC1 Spring 2026\organize coursematerials\Labs_2027\Lab1\Lab1Instructions.md`.
+  Good seeds for the intro: the ADC/DAC + 12-bit overview (§1.1), the instruments-by-lab table,
+  and the Lab 1 power-supply/voltmeter procedure (§3–4). Note its W1/W2-are-signal-not-power
+  caveat (49.9 Ω output) — the twin already models this.
+- **Delivery:** a Markdown/HTML doc rendered in-app (a `Quickstart` panel like `About`, or a
+  modal off the Welcome screen). Keep it course-agnostic enough for any first-time user, with the
+  EEC1 lab arc as the worked example. None of this touches `core/signal.ts`.
+
 ## Recommended session sequence
 
 A reasonable single-developer (single CC session per row) order:
