@@ -145,17 +145,26 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
       try {
         const d = JSON.parse(String(reader.result))
         const s = d.schematic, b = d.board
-        const okSchem = s && Array.isArray(s.components) && Array.isArray(s.wires)
-        const okBoard = b && Array.isArray(b.parts) && Array.isArray(b.jumpers) && Array.isArray(b.ports)
-        if (!okSchem || !okBoard) { setCheck({ ok: false, message: 'not a valid lab file (needs a schematic + board)' }); return }
-        setSchematic({ components: s.components, wires: s.wires })
-        setBoard({ parts: b.parts, jumpers: b.jumpers, ports: b.ports, dips: Array.isArray(b.dips) ? b.dips : [] })
-        const g = d.generators
-        if (g && g.w1 && g.w2 && onLoadGenerators) onLoadGenerators(g.w1, g.w2)
-        setTool({ kind: 'select' }); setPending(null)
-        setCheck({ ok: true, message: 'loaded ' + f.name })
+        const isLab = s && Array.isArray(s.components) && Array.isArray(s.wires) && b && Array.isArray(b.parts) && Array.isArray(b.jumpers) && Array.isArray(b.ports)
+        const isCircuit = Array.isArray(d.components) && Array.isArray(d.wires)
+        if (isLab) {
+          setSchematic({ components: s.components, wires: s.wires })
+          setBoard({ parts: b.parts, jumpers: b.jumpers, ports: b.ports, dips: Array.isArray(b.dips) ? b.dips : [] })
+          const g = d.generators
+          if (g && g.w1 && g.w2 && onLoadGenerators) onLoadGenerators(g.w1, g.w2)
+          setTool({ kind: 'select' }); setPending(null)
+          setCheck({ ok: true, message: 'loaded ' + f.name })
+        } else if (isCircuit) {
+          // A plain circuit file: load the circuit and start the board empty so the student places it.
+          setSchematic({ components: d.components, wires: d.wires })
+          setBoard({ parts: [], jumpers: [], ports: [], dips: [] })
+          setTool({ kind: 'select' }); setPending(null)
+          setCheck({ ok: true, message: `loaded circuit ${f.name} — board starts empty, place the parts` })
+        } else {
+          setCheck({ ok: false, message: 'not a valid circuit or lab file' })
+        }
       } catch {
-        setCheck({ ok: false, message: 'could not read lab file' })
+        setCheck({ ok: false, message: 'could not read file' })
       }
     }
     reader.readAsText(f)

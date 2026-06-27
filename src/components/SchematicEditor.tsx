@@ -132,7 +132,9 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
   // SCH-3: save the circuit to a .json file the student names. Uses the native Save dialog
   // (File System Access API) when the browser supports it, else falls back to a name prompt.
   async function saveCircuit() {
-    const json = JSON.stringify(sch, null, 2)
+    // Tag the file so it self-identifies as a circuit (vs a board "lab" bundle). Old untagged
+    // files (just {components,wires}) still load fine.
+    const json = JSON.stringify({ kind: 'm2k-circuit', version: 1, ...sch }, null, 2)
     const sfp = (window as unknown as {
       showSavePicker?: (o: {
         suggestedName?: string
@@ -175,16 +177,22 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
     reader.onload = () => {
       try {
         const d = JSON.parse(String(reader.result))
-        if (Array.isArray(d.components) && Array.isArray(d.wires)) {
-          setSch({ components: d.components, wires: d.wires })
+        // Accept either a circuit file ({components,wires}) or a board "lab" bundle (the circuit
+        // lives under .schematic) — so loading a lab file here still loads its circuit.
+        const fromLab = d && d.schematic && Array.isArray(d.schematic.components) && Array.isArray(d.schematic.wires)
+        const src = fromLab ? d.schematic : d
+        if (Array.isArray(src.components) && Array.isArray(src.wires)) {
+          setSch({ components: src.components, wires: src.wires })
           setSelected(null)
           setSelectedWire(null)
-          setSimStatus('loaded ' + f.name)
+          setSimStatus(fromLab
+            ? `loaded circuit from lab file ${f.name} — use the Board tab's Open to also restore the board`
+            : `loaded ${f.name}`)
         } else {
-          setSimStatus('not a valid circuit file')
+          setSimStatus('not a valid circuit or lab file')
         }
       } catch {
-        setSimStatus('could not read circuit file')
+        setSimStatus('could not read file')
       }
     }
     reader.readAsText(f)
