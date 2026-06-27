@@ -66,10 +66,11 @@ export interface DCRail {
 //  - 'ideal' (default): a single high-gain VCVS (E device) — infinite bandwidth, no clipping.
 //  - 'lmc662': behavioural model of the TI LMC662 dual CMOS op-amp used in the EEC1 course
 //    (datasheet: open-loop gain 126 dB, GBW 1.4 MHz, rail-to-rail output, slew 1.1 V/µs).
-//    Implemented as a single-pole macromodel (dominant pole at GBW/Aol ≈ 0.7 Hz so the
-//    gain·bandwidth product is 1.4 MHz) plus a B-source that clips the output to the supply
-//    rails. AC sees the bandwidth rolloff; transient sees the rail clipping. Slew rate is not
-//    modelled yet. `supplyPos`/`supplyNeg` set the clip rails (default ±5 V, the M2K supplies).
+//    Implemented as a transconductance macromodel: a gm stage with a clamped current drives the
+//    dominant-pole cap, giving open-loop gain 126 dB, GBW 1.4 MHz, slew rate 1.1 V/µs, plus a
+//    B-source that clips the output to the supply rails. AC shows the bandwidth rolloff; transient
+//    shows slew limiting and rail clipping. `supplyPos`/`supplyNeg` set the clip rails (default
+//    ±5 V, the M2K supplies).
 export interface OpAmp {
   kind: 'opamp'
   id: string // e.g. '1' -> E1
@@ -209,25 +210,31 @@ function inampLines(c: InAmp, n: (net: Net) => string): string[] {
   return L
 }
 
-// Op-amp emission. Ideal → one VCVS. LMC662 → single-pole macromodel + rail clip (see OpAmp).
+// Op-amp emission. Ideal → one VCVS. LMC662 → transconductance macromodel + rail clip (see OpAmp).
 function opampLines(c: OpAmp, n: (net: Net) => string): string[] {
   const inP = n(c.nodes.inP), inN = n(c.nodes.inN), out = n(c.nodes.out)
   if ((c.model ?? 'ideal') === 'ideal') {
     return [`E${c.id} ${out} 0 ${inP} ${inN} ${fmt(c.gain ?? 1e6)}`]
   }
-  // LMC662: dominant pole fp = GBW/Aol gives the 1.4 MHz gain·bandwidth product.
-  const aol = LMC662.aol
-  const fp = LMC662.gbw / aol
-  const rp = 1000
-  const cp = 1 / (2 * Math.PI * fp * rp)
+  // LMC662 macromodel: a transconductance stage (gm) drives the dominant-pole capacitor Cp.
+  // Three datasheet numbers fall out of this topology at once:
+  //   open-loop gain  Aol = gm·Rp           → Rp = Aol/gm
+  //   gain·bandwidth  GBW = gm/(2π·Cp)      → Cp = gm/(2π·GBW)
+  //   slew rate       SR  = Imax/Cp         → clamp the gm current at ±Imax = SR·Cp
+  // The B current source clamps the stage current (→ slew limit); the B voltage source clamps
+  // the output to the rails (→ clipping). gm is a free scale; pick 1 mA/V for sane R/C values.
+  const gm = 1e-3
+  const cp = gm / (2 * Math.PI * LMC662.gbw)
+  const rp = LMC662.aol / gm
+  const imax = LMC662.slewVPerUs * 1e6 * cp // SR in V/s × Cp
   const vp = c.supplyPos ?? 5
   const vn = c.supplyNeg ?? -5
-  const g = `xop${c.id}_g`, o = `xop${c.id}_o`
+  const o = `xop${c.id}_o`
   return [
-    `E${c.id} ${g} 0 ${inP} ${inN} ${fmt(aol)}`,        // open-loop gain
-    `Rp${c.id} ${g} ${o} ${fmt(rp)}`,                    // dominant-pole R…
-    `Cp${c.id} ${o} 0 ${fmt(cp)}`,                       // …and C → -20 dB/decade above fp
-    `B${c.id} ${out} 0 V = max(${fmt(vn)}, min(${fmt(vp)}, V(${o})))`, // rail-to-rail output clip
+    `Bg${c.id} 0 ${o} I = max(${(-imax).toExponential(6)}, min(${imax.toExponential(6)}, ${gm}*(V(${inP})-V(${inN}))))`,
+    `Rp${c.id} ${o} 0 ${fmt(rp)}`,                        // DC gain leg (gm·Rp = Aol)
+    `Cp${c.id} ${o} 0 ${fmt(cp)}`,                        // dominant pole + slew integrator
+    `Bo${c.id} ${out} 0 V = max(${fmt(vn)}, min(${fmt(vp)}, V(${o})))`, // rail-to-rail output clip
   ]
 }
 

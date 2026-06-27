@@ -36,6 +36,30 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-26 — LMC662: add slew-rate limiting — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**What I did:** reworked the LMC662 macromodel from a VCVS single-pole into a **transconductance**
+form so all three datasheet dynamics come from one topology: a gm stage whose current is clamped at
+±Imax drives the dominant-pole cap Cp. `Aol = gm·Rp`, `GBW = gm/(2π·Cp)`, and **`SR = Imax/Cp`** —
+clamping the charge current is the slew limit. gm = 1 mA/V; emitted as `Bg` (clamped current) → Rp‖Cp →
+`Bo` (rail clip). Prototyped the sign/values in the engine first (measured 1.100 V/µs on a follower).
+
+- `core/netlist.ts`: new `opampLines` topology (Bg current source + Rp/Cp + Bo clip).
+- `core/spice.test.ts` (+1): a 3 V/200 kHz unity follower is slew-limited; max |dV/dt| ≈ 1.1 V/µs.
+  The bandwidth (≈140 kHz) and clipping (+5 V) tests still pass unchanged with the new topology.
+- Updated `docs/reference/lmc662.md` (slew now modelled; topology + derivation).
+
+**Verification:** build clean; **68 passed (67 prior + 1 slew)**; 12-bit floor holds (no signal path).
+
+**State for the next session:** the LMC662 now reproduces gain, GBW, slew rate, and rail clipping. A
+fast square through a ×N stage shows slew-limited edges on the scope. Remaining non-idealities (offset,
+bias current, CMRR, noise, PSU-tracked rails) are still ideal — see the reference doc.
+
+---
+
 ### 2026-06-26 — LMC662: behavioural op-amp model (course part) — DONE
 
 **By:** Claude Code session (in Cowork)

@@ -295,6 +295,35 @@ describe('LMC662 behavioural op-amp', () => {
     const v = nodeVoltage(normalizeResult(await sim.runSim()), 'out')
     expect(v).toBeCloseTo(20, 0)
   }, 30000)
+
+  it('slew-rate limits a fast large signal (~1.1 V/µs)', async () => {
+    // Unity follower driven by a 3 V, 200 kHz sine. Required slope (2*pi*f*A ≈ 3.8 V/µs) exceeds
+    // the 1.1 V/µs slew rate, so the output is slew-limited — its max |dV/dt| ≈ SR.
+    const ckt: Ckt = {
+      title: 'follower slew',
+      components: [
+        { kind: 'vsource', id: '1', nodes: ['in', '0'], wave: { type: 'sine', offset: 0, amplitude: 3, freq: 200000, duty: 50 } },
+        { kind: 'opamp', id: '1', model: 'lmc662', nodes: { inP: 'in', inN: 'out', out: 'out' } },
+        { kind: 'ground', id: '0', node: '0' },
+      ],
+    }
+    const stop = 15e-6
+    const sim = new Simulation()
+    await sim.start()
+    sim.setNetList(buildNetlist(ckt, { kind: 'tran', step: 1e-8, stop }))
+    const r = normalizeResult(await sim.runSim())
+    const N = 3000
+    const grid = new Float64Array(N)
+    for (let k = 0; k < N; k++) grid[k] = 5e-6 + (k / (N - 1)) * (stop - 5e-6) // skip startup
+    const x = sampleNodeTransient(r, 'out', grid)!
+    let maxSlope = 0
+    for (let i = 1; i < N; i++) {
+      const sl = Math.abs((x[i] - x[i - 1]) / (grid[i] - grid[i - 1]))
+      if (sl > maxSlope) maxSlope = sl
+    }
+    expect(maxSlope / 1e6).toBeGreaterThan(0.85)
+    expect(maxSlope / 1e6).toBeLessThan(1.4)
+  }, 30000)
 })
 
 describe('analyzeBode (general -3 dB feature)', () => {
