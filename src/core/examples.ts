@@ -205,7 +205,12 @@ export const EXAMPLES: Example[] = [
   },
   {
     id: 'integrator', name: 'Integrator (op-amp)', group: 'Amplifiers',
-    blurb: 'Inverting integrator (Rf bounds DC gain). −20 dB/decade above ~70 Hz.',
+    blurb: 'Inverting integrator (Rf bounds DC gain, ~70 Hz corner). Drive well above the corner and a triangle integrates to a parabolic wave (CH2 in, CH1 out).',
+    // Drive at 1 kHz, ~14× above the ~70 Hz corner, so it integrates cleanly: output extrema land on
+    // the input zero-crossings. (τ = RfCf = 2.2 ms stays under the sim window, so it settles with no
+    // offset drift.) CH1 = output (~0.5 Vpp, 100 mV/div), CH2 = input (4 Vpp, 1 V/div).
+    w1: { waveType: 'triangle', frequency: 1000, amplitude: 2, offset: 0, dutyCycle: 50, samplingRate: 100000, duration: 0.016 },
+    ch1Vdiv: 0.1, ch2Vdiv: 1,
     schematic: {
       components: [
         { id: 'W1', kind: 'awg1', gx: 2, gy: 6 },
@@ -215,9 +220,11 @@ export const EXAMPLES: Example[] = [
         { id: 'Rf', kind: 'resistor', gx: 10, gy: 10, value: 22000 },
         { id: 'G1', kind: 'ground', gx: 8, gy: 4 },
         { id: 'P1', kind: 'scope1', gx: 16, gy: 5 },
+        { id: 'P2', kind: 'scope2', gx: 2, gy: 8 },
       ],
       wires: [
         { x1: 2, y1: 6, x2: 4, y2: 6 },    // W1 -> Rin.a
+        { x1: 2, y1: 6, x2: 2, y2: 8 },    // input -> 2+ (probe the drive)
         { x1: 6, y1: 6, x2: 10, y2: 6 },   // Rin.b -> inN
         { x1: 10, y1: 4, x2: 8, y2: 4 },   // inP -> ground
         { x1: 10, y1: 6, x2: 10, y2: 8 },  // inN -> Cf.a
@@ -231,7 +238,11 @@ export const EXAMPLES: Example[] = [
   },
   {
     id: 'differentiator', name: 'Differentiator (op-amp)', group: 'Amplifiers',
-    blurb: 'Inverting differentiator. +20 dB/decade (0 dB near 160 Hz).',
+    blurb: 'Inverting differentiator. +20 dB/decade (0 dB near 160 Hz): a triangle differentiates to a square (CH2 in, CH1 out).',
+    // Triangle in -> square out (derivative of constant slopes). CH1 = output (~±1.6 V, 0.5 V/div),
+    // CH2 = input (4 Vpp, 1 V/div).
+    w1: { waveType: 'triangle', frequency: 200, amplitude: 2, offset: 0, dutyCycle: 50, samplingRate: 100000, duration: 0.016 },
+    ch1Vdiv: 0.5, ch2Vdiv: 1,
     schematic: {
       components: [
         { id: 'W1', kind: 'awg1', gx: 2, gy: 6 },
@@ -240,9 +251,11 @@ export const EXAMPLES: Example[] = [
         { id: 'Rf', kind: 'resistor', gx: 10, gy: 8, value: 10000 },
         { id: 'G1', kind: 'ground', gx: 8, gy: 4 },
         { id: 'P1', kind: 'scope1', gx: 16, gy: 5 },
+        { id: 'P2', kind: 'scope2', gx: 2, gy: 8 },
       ],
       wires: [
         { x1: 2, y1: 6, x2: 4, y2: 6 },    // W1 -> Cin.a
+        { x1: 2, y1: 6, x2: 2, y2: 8 },    // input -> 2+ (probe the drive)
         { x1: 6, y1: 6, x2: 10, y2: 6 },   // Cin.b -> inN
         { x1: 10, y1: 4, x2: 8, y2: 4 },   // inP -> ground
         { x1: 10, y1: 6, x2: 10, y2: 8 },  // inN -> Rf.a
