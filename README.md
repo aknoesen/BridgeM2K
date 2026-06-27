@@ -28,7 +28,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173/m2k-scopy-web/`.
+Open `http://localhost:5173/BridgeM2K/`.
 
 ## Building
 
@@ -40,7 +40,7 @@ Output goes to `dist/`. The app is fully static (no backend).
 
 ## Deploying to GitHub Pages
 
-The Vite config sets `base: '/m2k-scopy-web/'` to match the GitHub Pages subdirectory. After building, push the `dist/` contents to the `gh-pages` branch, or use the `gh-pages` npm package:
+The Vite config sets `base: '/BridgeM2K/'` to match the GitHub Pages subdirectory. After building, push the `dist/` contents to the `gh-pages` branch, or use the `gh-pages` npm package:
 
 ```bash
 npm install --save-dev gh-pages

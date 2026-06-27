@@ -1,4 +1,4 @@
-# CLAUDE.md — m2k-scopy-web
+# CLAUDE.md — BridgeM2K
 
 A React digital twin of the Analog Devices ADALM2000 (M2K) USB instrument, built for
 the EEC1 first-year ECE course at UC Davis. Students interact with a browser-based
@@ -25,7 +25,7 @@ Do one phase per session, verify against the Definition of Done, update `PROGRES
 | Framework | React 19 + TypeScript + Vite 8 |
 | Plots | Plotly.js (`plotly.js-dist-min`) |
 | Build | `tsc && vite build` |
-| Deploy target | GitHub Pages at `/m2k-scopy-web/` (base set in `vite.config.ts`) |
+| Deploy target | GitHub Pages at `/BridgeM2K/` (base set in `vite.config.ts`) |
 | Dev server | `npm run dev` → `http://localhost:5173` (or 5174 if port taken) |
 
 No state management library. All state lives in `App.tsx` (signal params, running/tick)
@@ -199,7 +199,7 @@ npm run build          # outputs to dist/
 # then copy dist/ to GitHub Pages branch, or use gh-pages
 ```
 
-`vite.config.ts` has `base: '/m2k-scopy-web/'` — required for GitHub Pages subdirectory
+`vite.config.ts` has `base: '/BridgeM2K/'` — required for GitHub Pages subdirectory
 deployment. Asset paths break if this is removed.
 
 ## Planned additions (not yet implemented)

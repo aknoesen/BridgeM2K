@@ -19,7 +19,9 @@ export default function Welcome({ onEnter }: Props) {
       <img src={`${base}bridgem2k-lockup.svg`} alt="BridgeM2K" style={{ width: 'min(560px, 82vw)', maxHeight: 180 }} />
 
       <p style={{ maxWidth: 680, fontSize: 16, lineHeight: 1.7, color: 'rgba(255,255,255,0.82)', margin: 0 }}>
-        A browser-based digital twin of the Analog Devices ADALM2000. Draw a circuit, measure it with a
+        A browser-based digital twin of the Analog Devices{' '}
+        <a href="https://www.analog.com/en/resources/evaluation-hardware-and-software/evaluation-boards-kits/adalm2000.html"
+          target="_blank" rel="noopener noreferrer" style={{ color: AGGIE_GOLD, textDecoration: 'underline' }}>ADALM2000</a>. Draw a circuit, measure it with a
         full bench of instruments, and transfer it to a solderless breadboard — all in your browser, with
         no hardware and nothing to install.
       </p>
@@ -39,9 +41,14 @@ export default function Welcome({ onEnter }: Props) {
       </button>
 
       <div style={{ position: 'absolute', bottom: 18, fontSize: 11, color: 'rgba(255,255,255,0.65)' }}>
-        Open source · MIT License · <span style={{ color: AGGIE_GOLD }}>UC Davis EEC1</span> ·{' '}
-        <a href="https://github.com/aknoesen/m2k-scopy-web" target="_blank" rel="noopener noreferrer" style={{ color: AGGIE_GOLD }}>GitHub</a>
+        Open source · MIT License ·{' '}
+        <a href="https://github.com/aknoesen/BridgeM2K" target="_blank" rel="noopener noreferrer" style={{ color: AGGIE_GOLD }}>GitHub</a>
       </div>
+
+      {/* UC Davis official wordmark — subtle co-brand, bottom-right corner. White/reversed for the
+          Aggie Blue field, kept proportional (height auto) and not distorted. */}
+      <img src={`${base}ucdavis-wordmark.png`} alt="UC Davis"
+        style={{ position: 'absolute', right: 22, bottom: 16, width: 'min(140px, 34vw)', height: 'auto', opacity: 0.9 }} />
     </div>
   )
 }

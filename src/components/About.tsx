@@ -1,7 +1,7 @@
 // About panel — app identity, MIT license, and third-party open-source credits.
 import './Instrument.css'
 
-const REPO = 'https://github.com/aknoesen/m2k-scopy-web'
+const REPO = 'https://github.com/aknoesen/BridgeM2K'
 const CREDITS = [
   { name: 'ngspice', what: 'SPICE circuit simulator (compiled to WebAssembly)', license: 'modified BSD', url: 'https://ngspice.sourceforge.io/' },
   { name: 'eecircuit-engine', what: 'ngspice-WASM wrapper + TypeScript API', license: 'MIT', url: 'https://www.npmjs.com/package/eecircuit-engine' },

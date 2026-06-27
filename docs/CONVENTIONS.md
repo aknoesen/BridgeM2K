@@ -1,6 +1,6 @@
 # CONVENTIONS.md — engineering contract for all Claude Code sessions
 
-This is the style and architecture contract for `m2k-scopy-web`. Every Claude Code
+This is the style and architecture contract for `BridgeM2K`. Every Claude Code
 (CC) session that touches this repo must read this file, `CLAUDE.md`, the relevant
 spec in `docs/specs/`, and `docs/PROGRESS.md` before writing code.
 
@@ -241,7 +241,7 @@ Do not bundle unrelated changes. Do not commit `dist/`, `node_modules/`, or scra
 
 ## 11. Deployment constraint (easy to break)
 
-`vite.config.ts` sets `base: '/m2k-scopy-web/'` for GitHub Pages. Any asset that is fetched
+`vite.config.ts` sets `base: '/BridgeM2K/'` for GitHub Pages. Any asset that is fetched
 at runtime — **including the ngspice `.wasm` binary** — must resolve correctly under that
 base path, not assume site root. When wiring up `eecircuit-engine`, verify the WASM loads
 from a production `npm run build && npm run preview`, not just `npm run dev`. This is called
