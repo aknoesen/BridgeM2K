@@ -7,6 +7,7 @@ import {
   attachedWireEnds, moveComponentWithWires, moveSelectionBy, rotateComponentWithWires, type WireEndRef,
 } from '../core/schematic'
 import { buildNetlist } from '../core/netlist'
+import { EXAMPLES } from '../core/examples'
 import { createSpiceEngine, type SpiceEngine, transferFunction } from '../core/spice'
 import { UNIT, TUNE_RANGE, fmtEng, parseEng, tunePos, tuneValue } from '../core/units'
 import './Instrument.css'
@@ -444,6 +445,24 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
             <button className="run-btn" onClick={deleteSelected} disabled={!selected && selectedWire === null}>Delete</button>
             <button className="run-btn" onClick={saveCircuit}>Save</button>
             <button className="run-btn" onClick={() => fileRef.current?.click()}>Open</button>
+            <select className="run-btn" title="Load an example circuit" value=""
+              onChange={(e) => {
+                const ex = EXAMPLES.find((x) => x.id === e.target.value)
+                if (ex) {
+                  setSch(JSON.parse(JSON.stringify(ex.schematic)))
+                  setSelected(null); setSelectedWire(null)
+                  setSimStatus('loaded example: ' + ex.name)
+                }
+              }}>
+              <option value="">Examples ▾</option>
+              {['Passive', 'Amplifiers'].map((g) => (
+                <optgroup key={g} label={g}>
+                  {EXAMPLES.filter((x) => x.group === g).map((x) => (
+                    <option key={x.id} value={x.id}>{x.name}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
             <button className="run-btn" onClick={() => { setSch({ components: [], wires: [] }); setSelected(null); setSelectedWire(null) }}>Clear</button>
             <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={openCircuit} />
           </div>

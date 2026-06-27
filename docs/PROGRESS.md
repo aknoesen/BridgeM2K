@@ -36,6 +36,36 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-27 — Example circuit library (built-in Examples menu) — DONE
+
+**By:** Claude Code session
+**Commit:** uncommitted
+
+**What I did:**
+- New `src/core/examples.ts`: a library of pre-wired schematics students load from an **Examples**
+  dropdown in the Circuit editor header. Each has a W1 source, a 1+ (CH1) probe on the output, and
+  grounds, so it runs immediately in the Network Analyzer / scope.
+- Set (grouped Passive / Amplifiers): voltage divider (÷2), RC low-pass, RC high-pass, LC low-pass,
+  LC high-pass, inverting amp ×−2.2 (ideal + LMC662), non-inverting amp ×2 (ideal + LMC662).
+- The amp pairs share one skeleton parameterised by op-amp model: "ideal" = kind 'opamp' with no
+  rails (sim-only); "LMC662" = same with `opModel:'lmc662'` plus V+/V- rail parts — so the pair
+  also demonstrates the sim-only vs sim+build distinction. Gains kept small (≈2) so they don't clip
+  at the default 1 V input.
+- `SchematicEditor.tsx`: Examples `<select>` (optgroups) loads a deep-cloned schematic via setSch.
+
+**Verification (Definition of Done):**
+- build clean: yes — `tsc --noEmit` zero errors.
+- 12-bit floor: unaffected — no change to `signal.ts`.
+- math sanity check: simulated all 9 via the AC engine (tsx). Results match intent — divider −6 dB
+  flat; RC LP/HP −3 dB ≈ 1 kHz with ±20 dB/dec; LC LP/HP +6 dB resonant peak ≈ 1.6 kHz, ±40 dB/dec;
+  inverting +6.8 dB (×2.2); non-inverting +6.0 dB (×2); LMC662 versions roll off slightly by 100 kHz
+  (finite GBW). No toCircuit warnings; all probe `out`.
+
+**State for the next session:**
+- To add an example, append to `EXAMPLES` in `core/examples.ts` (id/name/group/blurb/schematic).
+  Grid layout notes are at the top of that file. Verify new ones by simulating before shipping.
+
+
 ### 2026-06-27 — E-1: preset lab layouts (replace hardcoded split) — DONE
 
 **By:** Claude Code session
