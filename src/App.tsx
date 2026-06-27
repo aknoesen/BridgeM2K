@@ -12,7 +12,7 @@ import SchematicEditor from './components/SchematicEditor'
 import Breadboard from './components/Breadboard'
 import About from './components/About'
 import Welcome from './components/Welcome'
-import { type BoardLayout, PLACEABLE_KINDS } from './core/breadboard'
+import { type BoardLayout, PLACEABLE_KINDS, DIP_KINDS } from './core/breadboard'
 import Voltmeter from './components/Voltmeter'
 import PowerSupply from './components/PowerSupply'
 import './App.css'
@@ -109,12 +109,13 @@ export default function App() {
   // circuit was loaded), reset jumpers + ports too so the board starts fresh for the new circuit.
   useEffect(() => {
     const valid = new Set(
-      schematic.components.filter((c) => PLACEABLE_KINDS.has(c.kind)).map((c) => c.id),
+      schematic.components.filter((c) => PLACEABLE_KINDS.has(c.kind) || DIP_KINDS.has(c.kind)).map((c) => c.id),
     )
     setBoard((b) => {
       const parts = b.parts.filter((p) => valid.has(p.id))
-      if (parts.length === b.parts.length) return b // nothing stale → leave the board alone
-      return parts.length === 0 ? { parts: [], jumpers: [], ports: [] } : { ...b, parts }
+      const dips = (b.dips ?? []).filter((d) => valid.has(d.id))
+      if (parts.length === b.parts.length && dips.length === (b.dips ?? []).length) return b // nothing stale
+      return parts.length === 0 && dips.length === 0 ? { parts: [], jumpers: [], ports: [], dips: [] } : { ...b, parts, dips }
     })
   }, [schematic])
 

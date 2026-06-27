@@ -36,6 +36,45 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-26 — F-3: LMC662 DIP on the breadboard — DONE
+
+**By:** Claude Code session
+**Commit:** uncommitted
+
+**What I did:**
+- Added a generic DIP model to `core/breadboard.ts`: `DIP_KINDS` (lmc662), `dipCols(kind)`,
+  `dipPinHoles(kind, col)` (8 holes straddling the channel-adjacent rows e/f; pin 1 bottom-left,
+  1→n along row f L→R, n+1→2n along row e R→L, matching the schematic terminal order), and a
+  `PlacedDip { id, kind, col }` stored on `BoardLayout.dips` (optional, so old saved boards load).
+- `schematicExpectation` now emits `dips` with each pin's net; `checkEquivalence` treats every DIP
+  pin as its own node (`U1.p1..p8`) in the board≟schematic partition compare, with a presence
+  check ("Place U1 on the board (straddle the channel)") and a `.pN` pin label.
+- `Breadboard.tsx`: a **(DIP)** chip in the palette, a `placeDip` tool — click a row-e hole and the
+  8-pin chip drops across the channel (rejects non-straddling anchors with a hint). Renders the body
+  + notch + per-pin net-coloured dots + label; included in Practice colouring, Clear, and delete.
+- `App.tsx`: the schematic→board sync now keeps/drops DIPs by id alongside 2-pin parts.
+- Each DIP pin lands in its own isolated terminal column (top/bottom banks are split by the
+  channel), so the student must jumper from each pin to the rest of the circuit — exactly the bench
+  reality.
+
+**Verification (Definition of Done):**
+- build clean: yes — `tsc --noEmit` zero errors.
+- 12-bit spectrum floor at −104 dBFS: unaffected — no change to `signal.ts` or the FFT pipeline;
+  Track F never touches signal math.
+- math sanity check: 6 new `breadboard.test.ts` cases + a standalone tsx run, all pass — pin-hole
+  order f5..e5; overrun→null; expectation has 1 dip/8 nets; unplaced→"Place U1"; lone placed DIP
+  matches (all pins isolated); jumper across two pins flagged as a short.
+
+**State for the next session:**
+- Adding the op-amp / INA DIP footprints (F-4) is now just: add the kind to `DIP_KINDS` and give it
+  a `dipCols` entry; the placement, render, and verification are kind-agnostic.
+- `BoardLayout.dips` is optional — existing autosaved boards (localStorage `m2k-board-v1`) stay valid.
+
+**Open questions / flags for andre:**
+- DIP orientation is fixed (notch left, pin 1 bottom-left). Want a rotate/flip option later?
+
+---
+
 ### 2026-06-26 — SCH-5: amplifier model picker (sim-only vs sim+build) — DONE
 
 **By:** Claude Code session

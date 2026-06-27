@@ -6,6 +6,7 @@ import { useMemo, useState, type Dispatch, type SetStateAction, type CSSProperti
 import {
   buildHoles, boardNets, boardWidth, boardHeight, PAD, PITCH, CHANNEL_SLOT,
   schematicExpectation, checkEquivalence, type BoardLayout, type CheckResult,
+  dipPinHoles, dipCols, holeKey, DIP_TOP_ROW, DIP_BOT_ROW,
 } from '../core/breadboard'
 import { type Schematic, type SchKind } from '../core/schematic'
 import './Instrument.css'
@@ -15,6 +16,7 @@ type Tool =
   | { kind: 'select' }
   | { kind: 'jumper' }
   | { kind: 'placePart'; id: string; partKind: SchKind }
+  | { kind: 'placeDip'; id: string; partKind: SchKind }
   | { kind: 'placePort'; port: string }
 
 const NET_COLORS = ['#f0a030', '#40c0e0', '#44dd88', '#e06fd0', '#d0d040', '#7a8cff', '#ff8855', '#55ddcc']
@@ -48,6 +50,7 @@ export default function Breadboard({ schematic, board, setBoard }: Props) {
     for (const p of board.parts) { used.add(nets.get(p.aHole)!); used.add(nets.get(p.bHole)!) }
     for (const p of board.ports) used.add(nets.get(p.hole)!)
     for (const j of board.jumpers) { used.add(nets.get(j.a)!); used.add(nets.get(j.b)!) }
+    for (const d of (board.dips ?? [])) for (const k of (dipPinHoles(d.kind, d.col) ?? [])) used.add(nets.get(k)!)
     const m = new Map<string, string>()
     let i = 0
     for (const n of used) { if (n) { m.set(n, NET_COLORS[i % NET_COLORS.length]); i++ } }
@@ -56,6 +59,7 @@ export default function Breadboard({ schematic, board, setBoard }: Props) {
 
   const showNets = mode === 'practice' || revealed
   const placedPart = new Map(board.parts.map((p) => [p.id, p]))
+  const placedDip = new Map((board.dips ?? []).map((d) => [d.id, d]))
   const placedPort = new Map(board.ports.map((p) => [p.port, p]))
 
   function onHole(key: string) {
@@ -71,6 +75,18 @@ export default function Breadboard({ schematic, board, setBoard }: Props) {
       const part = { id: tool.id, kind: tool.partKind, aHole: pending, bHole: key }
       setBoard((b) => ({ ...b, parts: [...b.parts.filter((p) => p.id !== tool.id), part] }))
       setPending(null); setTool({ kind: 'select' })
+      return
+    }
+    if (tool.kind === 'placeDip') {
+      const h = holeByKey.get(key)!
+      // Anchor must be the top-left pin: a hole in the channel-adjacent top row, with room to span.
+      if (h.row !== DIP_TOP_ROW || !dipPinHoles(tool.partKind, h.col)) {
+        setCheck({ ok: false, message: `Click a hole in row ${DIP_TOP_ROW} so the chip straddles the channel (needs ${dipCols(tool.partKind)} columns).` })
+        return
+      }
+      const dip = { id: tool.id, kind: tool.partKind, col: h.col }
+      setBoard((b) => ({ ...b, dips: [...(b.dips ?? []).filter((d) => d.id !== tool.id), dip] }))
+      setTool({ kind: 'select' })
       return
     }
     if (tool.kind === 'placePort') {
@@ -146,6 +162,26 @@ export default function Breadboard({ schematic, board, setBoard }: Props) {
                 </g>
               )
             })}
+            {(board.dips ?? []).map((d) => {
+              const pins = dipPinHoles(d.kind, d.col); if (!pins) return null
+              const n = dipCols(d.kind)
+              const tl = pos(holeKey(DIP_TOP_ROW, d.col)), br = pos(holeKey(DIP_BOT_ROW, d.col + n - 1))
+              const bx = tl.x - 7, by = tl.y - 7, bw = (br.x - tl.x) + 14, bh = (br.y - tl.y) + 14
+              return (
+                <g key={d.id} style={{ cursor: tool.kind === 'select' ? 'pointer' : 'default' }}
+                  onClick={() => { if (tool.kind === 'select') { setBoard((bb) => ({ ...bb, dips: (bb.dips ?? []).filter((x) => x.id !== d.id) })); setCheck(null) } }}>
+                  <rect x={bx} y={by} width={bw} height={bh} rx={3} fill="#1b1b1f" stroke="#888" strokeWidth={1} />
+                  {/* notch on the left edge marks pin-1 end (datasheet orientation) */}
+                  <path d={`M ${bx + 5} ${by + bh / 2 - 5} a 5 5 0 0 0 0 10`} fill="none" stroke="#888" strokeWidth={1} />
+                  {pins.map((k, i) => {
+                    const h = pos(k); const net = nets.get(k)!
+                    const col = (showNets && activeColor.get(net)) || '#cfcfcf'
+                    return <circle key={i} cx={h.x} cy={h.y} r={3.2} fill={col} stroke="#000" strokeWidth={0.5} />
+                  })}
+                  <text x={(bx + bx + bw) / 2} y={by + bh / 2 + 3} fontSize={8} fill="#cfcfcf" textAnchor="middle">{d.id} · LMC662</text>
+                </g>
+              )
+            })}
             {board.ports.map((p) => {
               const h = pos(p.hole)
               return (
@@ -169,7 +205,7 @@ export default function Breadboard({ schematic, board, setBoard }: Props) {
 
       <div className="settings-panel">
         <div className="section-title">Place from schematic</div>
-        {exp.parts.length === 0 && exp.ports.length === 0 ? (
+        {exp.parts.length === 0 && exp.dips.length === 0 && exp.ports.length === 0 ? (
           <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Draw a circuit in the Circuit tab above.</div>
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -177,6 +213,12 @@ export default function Breadboard({ schematic, board, setBoard }: Props) {
               <button key={p.id} style={chip(placedPart.has(p.id), tool.kind === 'placePart' && tool.id === p.id)}
                 onClick={() => { setTool({ kind: 'placePart', id: p.id, partKind: p.kind }); setPending(null); setCheck(null) }}>
                 {placedPart.has(p.id) ? '✓ ' : ''}{p.id}
+              </button>
+            ))}
+            {exp.dips.map((d) => (
+              <button key={d.id} style={chip(placedDip.has(d.id), tool.kind === 'placeDip' && tool.id === d.id)}
+                onClick={() => { setTool({ kind: 'placeDip', id: d.id, partKind: d.kind }); setPending(null); setCheck(null) }}>
+                {placedDip.has(d.id) ? '✓ ' : ''}{d.id} (DIP)
               </button>
             ))}
             {exp.ports.map((p) => (
@@ -192,11 +234,12 @@ export default function Breadboard({ schematic, board, setBoard }: Props) {
         <div className="wave-selector">
           <button className={tool.kind === 'select' ? 'active' : ''} onClick={() => { setTool({ kind: 'select' }); setPending(null) }}>Select</button>
           <button className={tool.kind === 'jumper' ? 'active' : ''} onClick={() => { setTool({ kind: 'jumper' }); setPending(null) }}>Jumper</button>
-          <button onClick={() => { setBoard({ parts: [], jumpers: [], ports: [] }); setCheck(null); setPending(null) }}>Clear</button>
+          <button onClick={() => { setBoard({ parts: [], jumpers: [], ports: [], dips: [] }); setCheck(null); setPending(null) }}>Clear</button>
         </div>
 
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 8, lineHeight: 1.6 }}>
           {tool.kind === 'placePart' ? `Placing ${tool.id}: click two holes for its legs.`
+            : tool.kind === 'placeDip' ? `Placing ${tool.id}: click a hole in row ${DIP_TOP_ROW} (top-left pin); the chip drops across the channel.`
             : tool.kind === 'placePort' ? `Placing ${tool.port}: click a hole (a rail, for power/ground).`
             : tool.kind === 'jumper' ? 'Jumper: click two holes to wire them together.'
             : 'Select: click a placed part, port, or jumper to remove it.'}

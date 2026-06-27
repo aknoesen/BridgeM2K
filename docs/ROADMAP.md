@@ -131,7 +131,8 @@ Spec: `docs/specs/breadboard.md`
 |-------|-------|-----------|--------|
 | F-1 | Breadboard model + parametric SVG render + Practice-mode net colouring | SCH-1 | DONE |
 | F-2 | Drag 2-pin parts from schematic + jumpers + verification loop (board ≟ schematic) | F-1 | DONE |
-| F-3 | (Stretch) DIP/IC footprints (op-amp, INA) + optional "show one valid layout" hint | F-2 | TODO |
+| F-3 | DIP/IC footprints on the board — LMC662 8-pin DIP (generic DIP framework; op-amp/INA are a trivial follow-on) | F-2 | DONE |
+| F-4 | (Stretch) remaining DIP footprints (op-amp, INA) + optional "show one valid layout" hint | F-3 | TODO |
 
 Decisions (locked with andre, 2026-06-26):
 - **Verification loop is the centerpiece** — Check tells the student if their board is electrically

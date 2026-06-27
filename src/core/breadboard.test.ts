@@ -94,3 +94,42 @@ describe('breadboard equivalence (F-2)', () => {
     expect(checkEquivalence(rcSch, b, holes).ok).toBe(true)
   })
 })
+
+import { schematicExpectation, dipPinHoles } from './breadboard'
+
+describe('breadboard DIP placement (F-3)', () => {
+  const holes = buildHoles()
+  const dipSch: Schematic = { components: [{ id: 'U1', kind: 'lmc662', gx: 10, gy: 4 }], wires: [] }
+
+  it('dipPinHoles places 8 pins straddling rows e/f, pin 1 bottom-left', () => {
+    expect(dipPinHoles('lmc662', 5)).toEqual(['f5', 'f6', 'f7', 'f8', 'e8', 'e7', 'e6', 'e5'])
+  })
+
+  it('rejects a DIP that overruns the board', () => {
+    expect(dipPinHoles('lmc662', 28)).toBeNull() // 28..31 > 30 columns
+  })
+
+  it('the schematic expects the LMC662 as a DIP with 8 pin nets', () => {
+    const exp = schematicExpectation(dipSch)
+    expect(exp.dips).toHaveLength(1)
+    expect(exp.dips[0].pinNets).toHaveLength(8)
+  })
+
+  it('reports a DIP that has not been placed', () => {
+    const r = checkEquivalence(dipSch, { parts: [], jumpers: [], ports: [], dips: [] }, holes)
+    expect(r.ok).toBe(false)
+    expect(r.message).toContain('U1')
+  })
+
+  it('a placed lone DIP matches (every pin its own isolated column)', () => {
+    const b: BoardLayout = { parts: [], jumpers: [], ports: [], dips: [{ id: 'U1', kind: 'lmc662', col: 5 }] }
+    expect(checkEquivalence(dipSch, b, holes).ok).toBe(true)
+  })
+
+  it('a jumper shorting two DIP pins is flagged', () => {
+    const b: BoardLayout = { parts: [], jumpers: [{ a: 'f5', b: 'f6' }], ports: [], dips: [{ id: 'U1', kind: 'lmc662', col: 5 }] }
+    const r = checkEquivalence(dipSch, b, holes)
+    expect(r.ok).toBe(false)
+    expect(r.message.toLowerCase()).toContain('connects them')
+  })
+})

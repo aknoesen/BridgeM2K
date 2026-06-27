@@ -120,37 +120,72 @@ export const PORT_NAME: Partial<Record<SchKind, string>> = {
 // 2-pin parts a student places on the board (F-2). DIP parts (op-amp/in-amp) are F-3.
 export const PLACEABLE_KINDS = new Set<SchKind>(['resistor', 'capacitor', 'inductor'])
 
+// DIP/IC parts placed on the board (F-3). Unlike a 2-pin part, every pin is its own net and the
+// body must straddle the center channel: pins sit in the two channel-adjacent term rows (e and f),
+// so each pin lands in its own isolated terminal column.
+export const DIP_KINDS = new Set<SchKind>(['lmc662'])
+export const DIP_TOP_ROW: Row = 'e' // top-bank row adjacent to the channel
+export const DIP_BOT_ROW: Row = 'f' // bottom-bank row adjacent to the channel
+
+// Columns a DIP spans (pins split evenly across the two rows). LMC662 = 8 pins → 4 columns.
+export function dipCols(kind: SchKind): number {
+  return kind === 'lmc662' ? 4 : 0
+}
+
+// Hole keys for a DIP whose top-left pin sits at (DIP_TOP_ROW, col), ordered to match the schematic
+// terminal order from terminalsOf (LMC662: OUTA,-A,+A,V-,+B,-B,OUTB,V+ = pins 1..8). Convention:
+// pin 1 bottom-left, pins 1→n along the bottom row L→R, pins n+1→2n along the top row R→L
+// (notch faces left). Returns null if the kind is not a DIP or it would overrun the board.
+export function dipPinHoles(kind: SchKind, col: number): string[] | null {
+  const n = dipCols(kind)
+  if (n === 0 || col < 1 || col + n - 1 > COLS) return null
+  const bottom: string[] = [], top: string[] = []
+  for (let i = 0; i < n; i++) {
+    bottom.push(holeKey(DIP_BOT_ROW, col + i)) // pins 1..n
+    top.push(holeKey(DIP_TOP_ROW, col + i))
+  }
+  return [...bottom, ...top.reverse()] // top row R→L gives pins n+1..2n
+}
+
 export interface PlacedPart { id: string; kind: SchKind; value?: number; aHole: string; bHole: string }
 export interface PlacedPort { port: string; hole: string }
-export interface BoardLayout { parts: PlacedPart[]; jumpers: Jumper[]; ports: PlacedPort[] }
+// A placed DIP is anchored by its top-left pin column; pin holes derive via dipPinHoles().
+export interface PlacedDip { id: string; kind: SchKind; col: number }
+export interface BoardLayout { parts: PlacedPart[]; jumpers: Jumper[]; ports: PlacedPort[]; dips?: PlacedDip[] }
 
-export const emptyBoard = (): BoardLayout => ({ parts: [], jumpers: [], ports: [] })
+export const emptyBoard = (): BoardLayout => ({ parts: [], jumpers: [], ports: [], dips: [] })
 
 // What the schematic expects on the board: its R/C/L parts (with each leg's net) and its ports.
 export interface SchematicExpectation {
   parts: { id: string; kind: SchKind; a: string; b: string }[]
+  dips: { id: string; kind: SchKind; pinNets: string[] }[]
   ports: { name: string; net: string }[]
 }
 export function schematicExpectation(s: Schematic): SchematicExpectation {
   const nets = computeNets(s)
   const netOf = (gx: number, gy: number) => nets.get(`${gx},${gy}`) ?? `x_${gx}_${gy}`
   const parts: SchematicExpectation['parts'] = []
+  const dips: SchematicExpectation['dips'] = []
   const ports = new Map<string, string>()
   for (const c of s.components) {
     const ts = terminalsOf(c)
     if (PLACEABLE_KINDS.has(c.kind)) {
       parts.push({ id: c.id, kind: c.kind, a: netOf(ts[0].gx, ts[0].gy), b: netOf(ts[1].gx, ts[1].gy) })
+    } else if (DIP_KINDS.has(c.kind)) {
+      dips.push({ id: c.id, kind: c.kind, pinNets: ts.map((t) => netOf(t.gx, t.gy)) })
     } else {
       const name = PORT_NAME[c.kind]
       if (name && !ports.has(name)) ports.set(name, netOf(ts[0].gx, ts[0].gy))
     }
   }
-  return { parts, ports: [...ports].map(([name, net]) => ({ name, net })) }
+  return { parts, dips, ports: [...ports].map(([name, net]) => ({ name, net })) }
 }
 
 export interface CheckResult { ok: boolean; message: string }
 
 function pinLabel(pin: string): string {
+  const dip = /^(.*)\.p(\d+)$/.exec(pin)
+  if (dip) return `${dip[1]} pin ${dip[2]}`
   const m = /^(.*)\.([AB])$/.exec(pin)
   return m ? `${m[1]} pin ${m[2]}` : pin
 }
@@ -160,13 +195,15 @@ function pinLabel(pin: string): string {
 // first problem found, with a student-friendly message.
 export function checkEquivalence(s: Schematic, board: BoardLayout, holes: Hole[]): CheckResult {
   const exp = schematicExpectation(s)
-  if (exp.parts.length === 0 && exp.ports.length === 0) {
+  if (exp.parts.length === 0 && exp.dips.length === 0 && exp.ports.length === 0) {
     return { ok: false, message: 'Draw a circuit in the Circuit tab first.' }
   }
   const placedPart = new Map(board.parts.map((p) => [p.id, p]))
+  const placedDip = new Map((board.dips ?? []).map((d) => [d.id, d]))
   const placedPort = new Map(board.ports.map((p) => [p.port, p]))
 
   for (const p of exp.parts) if (!placedPart.has(p.id)) return { ok: false, message: `Place ${p.id} on the board.` }
+  for (const d of exp.dips) if (!placedDip.has(d.id)) return { ok: false, message: `Place ${d.id} on the board (straddle the channel).` }
   for (const p of exp.ports) if (!placedPort.has(p.name)) return { ok: false, message: `Place the ${p.name} connection on the board.` }
 
   const bnets = boardNets(holes, board.jumpers)
@@ -178,6 +215,14 @@ export function checkEquivalence(s: Schematic, board: BoardLayout, holes: Hole[]
     const pl = placedPart.get(p.id)!
     schem.set(`${p.id}.A`, p.a); brd.set(`${p.id}.A`, bn(pl.aHole))
     schem.set(`${p.id}.B`, p.b); brd.set(`${p.id}.B`, bn(pl.bHole))
+  }
+  for (const d of exp.dips) {
+    const pl = placedDip.get(d.id)!
+    const holesForDip = dipPinHoles(d.kind, pl.col) ?? []
+    d.pinNets.forEach((net, k) => {
+      schem.set(`${d.id}.p${k + 1}`, net)
+      brd.set(`${d.id}.p${k + 1}`, bn(holesForDip[k] ?? `?${d.id}.${k}`))
+    })
   }
   for (const p of exp.ports) {
     schem.set(p.name, p.net); brd.set(p.name, bn(placedPort.get(p.name)!.hole))
