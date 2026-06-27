@@ -46,8 +46,10 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
   a leftover from the two-instrument era) with a `Preset` workspace model: an ordered list of
   panel ids + an arrangement hint (`single | row | grid`). Single-instrument view is a one-panel
   workspace; `presetId` null = single, else a multi-panel preset.
-- Seeded presets in the nav under a "Layouts" separator: **Lab 3** (Signal Gen + Spectrum, row),
-  **Lab 5** (Circuit + Network Analyzer, row), **Bench** (Scope + Supply + Voltmeter, grid).
+- Presets are **named by what they show, not by a lab** (the twin isn't course-specific), and live
+  in a single **"Layouts" dropdown** in the nav (not a row of buttons): Generator + Spectrum,
+  Generator + Scope, Circuit + Network (Bode), Circuit + Scope, Scope + Supply + Voltmeter.
+  Picking "Single view" / any instrument button returns to one panel.
 - `App.tsx` `<main>` now renders `panels.map(renderPanel)`; `renderPanel(id)` is a single switch
   that returns each instrument with its existing props and passes `compact` (where supported:
   scope/siggen/spectrum) when more than one panel is visible. CSS grid/flex via

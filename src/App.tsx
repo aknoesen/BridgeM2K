@@ -23,11 +23,14 @@ type ActiveInstrument = 'siggen' | 'spectrum' | 'scope' | 'network' | 'schematic
 // arrangement hint; CSS grid/flex in `.instrument-area` lays them out. Single-instrument view is
 // just a one-panel workspace. No drag-docking (that's E-2) and no new dependency.
 type Arrange = 'single' | 'row' | 'grid'
-interface Preset { id: string; icon: string; label: React.ReactNode; title: string; panels: ActiveInstrument[]; arrange: Arrange }
+// Layouts are described by what they show, not by a course/lab — anyone can use the twin.
+interface Preset { id: string; name: string; panels: ActiveInstrument[]; arrange: Arrange }
 const PRESETS: Preset[] = [
-  { id: 'lab3', icon: '⊟', label: <>Lab 3<br />Spectrum</>, title: 'Lab 3 — Signal Gen + Spectrum', panels: ['siggen', 'spectrum'], arrange: 'row' },
-  { id: 'lab5', icon: '⊞', label: <>Lab 5<br />Circuit</>, title: 'Lab 5 — Circuit + Network Analyzer (Bode)', panels: ['schematic', 'network'], arrange: 'row' },
-  { id: 'bench', icon: '▦', label: <>Bench</>, title: 'Bench — Scope + Supply + Voltmeter', panels: ['scope', 'psu', 'voltmeter'], arrange: 'grid' },
+  { id: 'gen-spectrum', name: 'Generator + Spectrum', panels: ['siggen', 'spectrum'], arrange: 'row' },
+  { id: 'gen-scope', name: 'Generator + Scope', panels: ['siggen', 'scope'], arrange: 'row' },
+  { id: 'circuit-bode', name: 'Circuit + Network (Bode)', panels: ['schematic', 'network'], arrange: 'row' },
+  { id: 'circuit-scope', name: 'Circuit + Scope', panels: ['schematic', 'scope'], arrange: 'row' },
+  { id: 'bench', name: 'Scope + Supply + Voltmeter', panels: ['scope', 'psu', 'voltmeter'], arrange: 'grid' },
 ]
 const WORKSPACE_KEY = 'm2k-workspace-v1'
 
@@ -355,12 +358,11 @@ export default function App() {
         {navBtn('breadboard', '∷', 'Board', 'Breadboard layout')}
 
         <div className="nav-sep">Layouts</div>
-        {PRESETS.map((p) => (
-          <button key={p.id} className={`nav-btn ${presetId === p.id ? 'nav-active' : ''}`}
-            onClick={() => setPresetId(p.id)} title={p.title}>
-            <span className="nav-icon">{p.icon}</span><span className="nav-label">{p.label}</span>
-          </button>
-        ))}
+        <select className={`nav-layouts ${presetId ? 'nav-active' : ''}`} value={presetId ?? ''}
+          onChange={(e) => setPresetId(e.target.value || null)} title="Multi-panel layouts">
+          <option value="">Single view</option>
+          {PRESETS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
 
         <button className={`nav-btn ${active === 'about' && !presetId ? 'nav-active' : ''}`}
           style={{ marginTop: 'auto' }}

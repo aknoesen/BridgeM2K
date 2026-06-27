@@ -115,6 +115,21 @@
   margin: 8px 0 2px;
   opacity: 0.7;
 }
+.nav-layouts {
+  width: 100%;
+  margin: 2px 0 4px;
+  padding: 4px 6px;
+  font-size: 11px;
+  background: var(--bg-panel, #2a2a2a);
+  color: var(--text-primary, #eee);
+  border: 1px solid #333;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.nav-layouts.nav-active {
+  border-color: var(--accent-blue, #4a9eff);
+  color: var(--accent-blue, #4a9eff);
+}
 
 /* License / credit badge — subtle, bottom-right, click-through except the link */
 .license-badge {
