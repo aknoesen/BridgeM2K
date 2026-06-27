@@ -226,3 +226,24 @@ describe('LMC662 dual DIP (toCircuit)', () => {
     expect(ops[0].nodes.vpos).not.toBe(ops[0].nodes.vneg)
   })
 })
+
+import { moveComponentsBy } from './schematic'
+describe('moveComponentsBy (group drag)', () => {
+  it('translates selected parts and their attached wire ends; stretches links to non-selected', () => {
+    const s: Schematic = {
+      components: [
+        { id: 'R1', kind: 'resistor', gx: 2, gy: 2, value: 1 },
+        { id: 'R2', kind: 'resistor', gx: 6, gy: 2, value: 1 },
+      ],
+      wires: [
+        { x1: 4, y1: 2, x2: 6, y2: 2 }, // R1.b -> R2.a (both selected)
+        { x1: 8, y1: 2, x2: 12, y2: 2 }, // R2.b -> external (only R2 selected)
+      ],
+    }
+    const out = moveComponentsBy(s, new Set(['R1', 'R2']), 0, 3)
+    expect(out.components.find((c) => c.id === 'R1')!.gy).toBe(5)
+    expect(out.components.find((c) => c.id === 'R2')!.gy).toBe(5)
+    expect(out.wires[0]).toEqual({ x1: 4, y1: 5, x2: 6, y2: 5 })
+    expect(out.wires[1]).toEqual({ x1: 8, y1: 5, x2: 12, y2: 2 }) // stretched
+  })
+})

@@ -4,7 +4,7 @@
 import { useMemo, useRef, useState, useEffect, type ReactElement, type Dispatch, type SetStateAction } from 'react'
 import {
   Schematic, SchComponent, SchKind, terminalsOf, toCircuit,
-  attachedWireEnds, moveComponentWithWires, rotateComponentWithWires, type WireEndRef,
+  attachedWireEnds, moveComponentWithWires, moveComponentsBy, rotateComponentWithWires, type WireEndRef,
 } from '../core/schematic'
 import { buildNetlist } from '../core/netlist'
 import { createSpiceEngine, type SpiceEngine, transferFunction } from '../core/spice'
@@ -75,8 +75,14 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
   const setSch = setSchematic
   const [tool, setTool] = useState<Tool>('resistor')
   const [selected, setSelected] = useState<string | null>(null)
+  const [selSet, setSelSet] = useState<Set<string>>(new Set()) // multi-select (shift-click)
   const [wireStart, setWireStart] = useState<{ x: number; y: number } | null>(null)
-  const [drag, setDrag] = useState<{ id: string; ox: number; oy: number; attached: WireEndRef[] } | null>(null)
+  // Single drag (one component, absolute target) OR group drag (a set, by delta from last grid pos).
+  const [drag, setDrag] = useState<
+    | { id: string; ox: number; oy: number; attached: WireEndRef[] }
+    | { ids: string[]; lastGx: number; lastGy: number }
+    | null
+  >(null)
   const [placeRotation, setPlaceRotation] = useState(0)
   const [simStatus, setSimStatus] = useState('')
   const [simBusy, setSimBusy] = useState(false)
@@ -192,7 +198,7 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
   function onBackgroundClick(e: React.MouseEvent) {
     const { gx, gy } = gridAt(e)
     setSelectedWire(null)
-    if (tool === 'select') { setSelected(null); return }
+    if (tool === 'select') { setSelected(null); setSelSet(new Set()); return }
     if (tool === 'wire') {
       if (!wireStart) setWireStart({ x: gx, y: gy })
       else {
@@ -208,16 +214,29 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
     const c: SchComponent = { id: newId(kind, sch.components), kind, gx, gy, rotation: placeRotation, value: DEFAULT_VALUE[kind] }
     setSch((s) => ({ ...s, components: [...s.components, c] }))
     setSelected(c.id)
+    setSelSet(new Set([c.id]))
   }
 
   function onComponentDown(e: React.MouseEvent, id: string) {
     e.stopPropagation()
-    setSelected(id) // clicking a placed part selects it in any tool (so R / Rotate act on it)
     setSelectedWire(null)
+    if (e.shiftKey) {
+      // Shift-click toggles membership in the multi-selection (no drag starts).
+      setSelSet((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+      setSelected(id)
+      return
+    }
+    setSelected(id) // clicking a placed part selects it in any tool (so R / Rotate act on it)
+    const groupDrag = selSet.has(id) && selSet.size > 1
+    if (!groupDrag) setSelSet(new Set([id]))
     if (tool !== 'select') return
     const { gx, gy } = gridAt(e)
-    const c = sch.components.find((x) => x.id === id)!
-    setDrag({ id, ox: gx - c.gx, oy: gy - c.gy, attached: attachedWireEnds(sch, c) })
+    if (groupDrag) {
+      setDrag({ ids: [...selSet], lastGx: gx, lastGy: gy })
+    } else {
+      const c = sch.components.find((x) => x.id === id)!
+      setDrag({ id, ox: gx - c.gx, oy: gy - c.gy, attached: attachedWireEnds(sch, c) })
+    }
   }
   function onWireClick(e: React.MouseEvent, i: number) {
     e.stopPropagation()
@@ -229,6 +248,17 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
     const { gx, gy } = gridAt(e)
     setHoverGrid({ gx, gy }) // live snap indicator for the wire tool
     if (!drag) return
+    if ('ids' in drag) {
+      // Group drag: translate the whole selection by the delta since the last grid position,
+      // clamped so nothing crosses the top/left edge.
+      let ddx = gx - drag.lastGx, ddy = gy - drag.lastGy
+      const minGx = Math.min(...drag.ids.map((id) => sch.components.find((c) => c.id === id)?.gx ?? 0))
+      const minGy = Math.min(...drag.ids.map((id) => sch.components.find((c) => c.id === id)?.gy ?? 0))
+      ddx = Math.max(ddx, -minGx); ddy = Math.max(ddy, -minGy)
+      if (ddx !== 0 || ddy !== 0) setSch((s) => moveComponentsBy(s, new Set(drag.ids), ddx, ddy))
+      setDrag({ ids: drag.ids, lastGx: drag.lastGx + ddx, lastGy: drag.lastGy + ddy })
+      return
+    }
     setSch((s) => moveComponentWithWires(s, drag.id, Math.max(0, gx - drag.ox), Math.max(0, gy - drag.oy), drag.attached))
   }
   function onMouseUp() { setDrag(null) }
@@ -239,9 +269,14 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
       setSelectedWire(null)
       return
     }
+    if (selSet.size > 1) {
+      setSch((s) => ({ ...s, components: s.components.filter((c) => !selSet.has(c.id)) }))
+      setSelSet(new Set()); setSelected(null)
+      return
+    }
     if (!selected) return
     setSch((s) => ({ ...s, components: s.components.filter((c) => c.id !== selected) }))
-    setSelected(null)
+    setSelSet(new Set()); setSelected(null)
   }
   function rotate() {
     if (selected) {
@@ -356,7 +391,7 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
           {sch.components.map((c) => (
             <g key={c.id} onMouseDown={(e) => onComponentDown(e, c.id)} onClick={(e) => e.stopPropagation()}
               style={{ cursor: tool === 'select' ? 'move' : 'pointer', pointerEvents: tool === 'wire' ? 'none' : 'auto' }}>
-              {renderSymbol(c, px, c.id === selected)}
+              {renderSymbol(c, px, c.id === selected || selSet.has(c.id))}
               {terminalsOf(c).map((t, i) => (
                 <circle key={i} cx={px(t.gx)} cy={px(t.gy)} r={3} fill="var(--node-color)" />
               ))}
@@ -381,6 +416,9 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
 
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4 }}>
           Place angle: {placeRotation * 90}° &nbsp;(press R to rotate; rotates selected part if one is selected)
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 2 }}>
+          Select tool: <b>Shift+click</b> to select multiple parts, then drag any of them to move the group{selSet.size > 1 ? ` (${selSet.size} selected)` : ''}.
         </div>
 
         <div className="section-title">Selected</div>

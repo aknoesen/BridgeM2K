@@ -36,6 +36,30 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-26 — EDIT-2: multi-select + group drag in the schematic editor — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**Why:** andre — parts placed too low/cramped can be hard to reposition; needed to grab several and
+drag them together.
+
+**What I did:**
+- `core/schematic.ts`: `moveComponentsBy(s, ids, ddx, ddy)` — translates a SET of components by a
+  delta, carrying wire endpoints sitting on any selected terminal (a wire between two selected parts
+  translates whole; a wire to a non-selected part stretches).
+- `SchematicEditor.tsx`: a `selSet` multi-selection. **Shift+click** toggles parts in/out of the
+  selection; dragging any selected part moves the whole group (clamped at the top/left edge). Group
+  delete, group highlight, and a one-line hint. Single-part drag/select unchanged.
+- `core/schematic.test.ts` (+1): group translate moves internal wires whole and stretches links out.
+
+**Verification:** build clean; **73 passed (72 prior + 1 group-move)**; 12-bit floor holds.
+
+**State for the next session — still on andre's list:** Board DIP (F-3), schematic flip/mirror, and
+Save-with-directory. Multi-select is shift-click only (no marquee box-select yet — easy follow-up).
+
+---
+
 ### 2026-06-26 — LMC662-DIP: dual op-amp as an 8-pin DIP (schematic side) — DONE
 
 **By:** Claude Code session (in Cowork)
