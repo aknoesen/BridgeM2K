@@ -219,20 +219,15 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
       )
     }
 
-    // Y axis: traces are scaled to divisions internally (keeps trigger/cursor math simple), but we
-    // label the gridlines in real volts off the CH1 Volts/div so students read amplitude directly.
-    const yTickVals: number[] = []
-    for (let d = -half; d <= half; d++) yTickVals.push(d)
-    const yTickText = yTickVals.map((d) => String(+(d * ch1VoltsPerDiv).toFixed(3)))
-    const yTitle = ch2Enabled && ch2VoltsPerDiv !== ch1VoltsPerDiv ? 'Volts (CH1 scale)' : 'Volts'
-
     const layout: Partial<Plotly.Layout> = {
       paper_bgcolor: 'var(--bg-display)', plot_bgcolor: 'var(--bg-display)',
       font: { color: 'var(--text-primary)', size: 11 },
       margin: { l: 48, r: 16, t: 24, b: 44 }, showlegend: false,
       xaxis: { title: { text: `Time (${tUnit})`, font: { size: 11 } }, range: [0, windowDisp], dtick: timePerDiv * tScale,
         gridcolor: '#2a2a2a', zerolinecolor: '#444', tickfont: { size: 10 }, color: 'var(--text-secondary)' },
-      yaxis: { title: { text: yTitle, font: { size: 11 } }, range: [-half, half], tickvals: yTickVals, ticktext: yTickText,
+      // Scopy-faithful: vertical grid in divisions; exact volts come from the measurements row and
+      // cursors. Per-channel Volts/div + offset scale each trace onto this shared 8-division grid.
+      yaxis: { title: { text: 'Divisions', font: { size: 11 } }, range: [-half, half], dtick: 1,
         gridcolor: '#2a2a2a', zerolinecolor: '#666', tickfont: { size: 10 }, color: 'var(--text-secondary)' },
       shapes,
     }
