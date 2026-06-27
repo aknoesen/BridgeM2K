@@ -49,6 +49,8 @@ const VOLTS_PER_DIV: { label: string; value: number }[] = [
   { label: '200 mV', value: 0.2 },
   { label: '500 mV', value: 0.5 },
   { label: '1 V', value: 1 },
+  { label: '2 V', value: 2 },   // ±8 V view — fits a rail-clipped op-amp output
+  { label: '5 V', value: 5 },   // ±20 V view — matches the M2K ±25 V input span
 ]
 const CH1_COLOR = '#f0a030'
 const CH2_COLOR = '#40c0e0'
