@@ -84,7 +84,7 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
   const fileRef = useRef<HTMLInputElement>(null)
   const sch = schematic
   const setSch = setSchematic
-  const [tool, setTool] = useState<Tool>('resistor')
+  const [tool, setTool] = useState<Tool>('select')
   const [selected, setSelected] = useState<string | null>(null)
   const [selSet, setSelSet] = useState<Set<string>>(new Set()) // multi-select (shift-click or box)
   const [selWires, setSelWires] = useState<Set<string>>(new Set()) // box-selected wire ends "i:1"/"i:2"
