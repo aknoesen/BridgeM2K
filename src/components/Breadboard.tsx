@@ -31,9 +31,11 @@ interface Props {
   // input level — e.g. a gain-10 amp wants a ~0.3 V input, not the 1 V default that clips.
   generators?: { w1: SignalParams; w2: SignalParams }
   onLoadGenerators?: (w1: SignalParams, w2: SignalParams) => void
+  // Push the current schematic onto the shared undo history before a lab Open replaces it.
+  snapshotSchematic?: () => void
 }
 
-export default function Breadboard({ schematic, setSchematic, board, setBoard, generators, onLoadGenerators }: Props) {
+export default function Breadboard({ schematic, setSchematic, board, setBoard, generators, onLoadGenerators, snapshotSchematic }: Props) {
   const holes = useMemo(() => buildHoles(), [])
   const holeByKey = useMemo(() => new Map(holes.map((h) => [h.key, h])), [holes])
   const exp = useMemo(() => schematicExpectation(schematic), [schematic])
@@ -148,6 +150,7 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
         const isLab = s && Array.isArray(s.components) && Array.isArray(s.wires) && b && Array.isArray(b.parts) && Array.isArray(b.jumpers) && Array.isArray(b.ports)
         const isCircuit = Array.isArray(d.components) && Array.isArray(d.wires)
         if (isLab) {
+          snapshotSchematic?.()
           setSchematic({ components: s.components, wires: s.wires })
           setBoard({ parts: b.parts, jumpers: b.jumpers, ports: b.ports, dips: Array.isArray(b.dips) ? b.dips : [] })
           const g = d.generators
@@ -156,6 +159,7 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
           setCheck({ ok: true, message: 'loaded ' + f.name })
         } else if (isCircuit) {
           // A plain circuit file: load the circuit and start the board empty so the student places it.
+          snapshotSchematic?.()
           setSchematic({ components: d.components, wires: d.wires })
           setBoard({ parts: [], jumpers: [], ports: [], dips: [] })
           setTool({ kind: 'select' }); setPending(null)

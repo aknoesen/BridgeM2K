@@ -65,9 +65,13 @@ function newId(k: SchKind, comps: { id: string }[]): string {
 interface EditorProps {
   schematic: Schematic
   setSchematic: Dispatch<SetStateAction<Schematic>>
+  // Shared schematic undo/redo, owned by App so the Board tab's lab load uses the same history.
+  snapshot: () => void
+  undo: () => void
+  redo: () => void
 }
 
-export default function SchematicEditor({ schematic, setSchematic }: EditorProps) {
+export default function SchematicEditor({ schematic, setSchematic, snapshot, undo, redo }: EditorProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const sch = schematic
@@ -96,33 +100,9 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
   const [hoverGrid, setHoverGrid] = useState<{ gx: number; gy: number } | null>(null)
   const [selectedWire, setSelectedWire] = useState<number | null>(null)
 
-  // ---- Edit history (undo/redo) + clipboard (copy/paste/cut) ----------------------------------
-  const past = useRef<Schematic[]>([])
-  const future = useRef<Schematic[]>([])
+  // ---- Clipboard (copy/paste/cut). Undo/redo (snapshot/undo/redo) come from App via props. -----
   const dragSnapped = useRef(false) // snapshot once per drag/tune gesture, not per mouse-move
   const clip = useRef<{ components: Schematic['components']; wires: Schematic['wires'] } | null>(null)
-  const HIST_MAX = 100
-
-  // Record the current schematic before a mutating edit, so Ctrl+Z can return to it.
-  function snapshot() {
-    past.current.push(sch)
-    if (past.current.length > HIST_MAX) past.current.shift()
-    future.current = []
-  }
-  function undo() {
-    if (!past.current.length) return
-    future.current.push(sch)
-    const prev = past.current.pop()!
-    setSch(prev)
-    setSelected(null); setSelectedWire(null); setSelSet(new Set()); setSelWires(new Set())
-  }
-  function redo() {
-    if (!future.current.length) return
-    past.current.push(sch)
-    const next = future.current.pop()!
-    setSch(next)
-    setSelected(null); setSelectedWire(null); setSelSet(new Set()); setSelWires(new Set())
-  }
 
   // Copy the current selection (parts + any wires whose both ends sit on selected parts' pins).
   function copySelection(): boolean {
@@ -436,8 +416,9 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
       const mod = e.ctrlKey || e.metaKey
       if (mod) {
         const k = e.key.toLowerCase()
-        if (k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo() }
-        else if (k === 'y') { e.preventDefault(); redo() }
+        const clearSel = () => { setSelected(null); setSelectedWire(null); setSelSet(new Set()); setSelWires(new Set()) }
+        if (k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); clearSel() }
+        else if (k === 'y') { e.preventDefault(); redo(); clearSel() }
         else if (k === 'c') { e.preventDefault(); copySelection() }
         else if (k === 'v') { e.preventDefault(); pasteClipboard() }
         else if (k === 'x') { e.preventDefault(); cutSelection() }

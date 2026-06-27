@@ -100,6 +100,29 @@ export default function App() {
   const [running, setRunning] = useState(true)
   const [schematic, setSchematic] = useState<Schematic>(loadStoredSchematic)
   const [board, setBoard] = useState<BoardLayout>(loadStoredBoard)
+
+  // Shared schematic undo/redo history (one stack owned here, so every editor of the schematic —
+  // the Circuit editor and the Board tab's lab load — pushes to the same history). Callers snapshot
+  // explicitly before a discrete edit; setSchematic itself stays raw (drags must not flood history).
+  const schematicRef = useRef(schematic); schematicRef.current = schematic
+  const histPast = useRef<Schematic[]>([])
+  const histFuture = useRef<Schematic[]>([])
+  const HIST_MAX = 100
+  function snapshotSchematic() {
+    histPast.current.push(schematicRef.current)
+    if (histPast.current.length > HIST_MAX) histPast.current.shift()
+    histFuture.current = []
+  }
+  function undoSchematic() {
+    if (!histPast.current.length) return
+    histFuture.current.push(schematicRef.current)
+    setSchematic(histPast.current.pop()!)
+  }
+  function redoSchematic() {
+    if (!histFuture.current.length) return
+    histPast.current.push(schematicRef.current)
+    setSchematic(histFuture.current.pop()!)
+  }
   const [tick, setTick] = useState(0)
   const rafRef = useRef<number | null>(null)
 
@@ -310,12 +333,15 @@ export default function App() {
           circuitFs={scopeCircuitFs} onWindowSecChange={setScopeWinSec} compact={multi}
           onRunToggle={() => setRunning(r => !r)} onParams2Change={(k, v) => setParams2(prev => ({ ...prev, [k]: v }))} />
       case 'schematic':
-        return <SchematicEditor schematic={schematic} setSchematic={setSchematic} />
+        return <SchematicEditor schematic={schematic} setSchematic={setSchematic}
+          snapshot={snapshotSchematic} undo={undoSchematic} redo={redoSchematic} />
       case 'breadboard':
         return (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', minHeight: 0 }}>
-            <div className="stacked-pane"><SchematicEditor schematic={schematic} setSchematic={setSchematic} /></div>
+            <div className="stacked-pane"><SchematicEditor schematic={schematic} setSchematic={setSchematic}
+              snapshot={snapshotSchematic} undo={undoSchematic} redo={redoSchematic} /></div>
             <div className="stacked-pane"><Breadboard schematic={schematic} setSchematic={setSchematic} board={board} setBoard={setBoard}
+              snapshotSchematic={snapshotSchematic}
               generators={{ w1: params, w2: params2 }}
               onLoadGenerators={(w1, w2) => { setParams({ ...DEFAULT_PARAMS, ...w1 }); setParams2({ ...DEFAULT_PARAMS2, ...w2 }) }} /></div>
           </div>
