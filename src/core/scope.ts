@@ -101,3 +101,78 @@ export function voltsAxisRange(
   const half = (vDivs / 2) * voltsPerDiv
   return [-half, half]
 }
+
+// ── Measurements (OSC-5) ───────────────────────────────────────────────────────
+// Quantities read off the captured window, Scopy-style. Amplitude stats are exact;
+// timing (freq/period/duty) comes from interpolated mid-level crossings, the same
+// sub-sample technique the trigger uses, so values match what a student computes by
+// hand. Timing fields are null when the window holds no full cycle (e.g. a DC/flat
+// trace) rather than reporting a bogus frequency.
+
+export interface ScopeMeasurements {
+  vpp: number
+  vmax: number
+  vmin: number
+  mean: number
+  vrms: number
+  freq: number | null
+  period: number | null
+  duty: number | null // fraction 0..1 (time above mid-level / period)
+}
+
+// Linear-interpolated time (seconds) of the mid-level crossing between samples i-1 and i.
+function crossTime(v: ArrayLike<number>, i: number, mid: number, dt: number): number {
+  const a = v[i - 1]
+  const b = v[i]
+  const frac = (mid - a) / (b - a)
+  return (i - 1 + frac) * dt
+}
+
+// Measure a uniformly-sampled voltage trace. `dt` is the sample spacing in seconds.
+export function measureTrace(v: ArrayLike<number>, dt: number): ScopeMeasurements {
+  const n = v.length
+  if (n === 0) {
+    return { vpp: 0, vmax: 0, vmin: 0, mean: 0, vrms: 0, freq: null, period: null, duty: null }
+  }
+  let vmax = -Infinity
+  let vmin = Infinity
+  let sum = 0
+  let sumSq = 0
+  for (let i = 0; i < n; i++) {
+    const x = v[i]
+    if (x > vmax) vmax = x
+    if (x < vmin) vmin = x
+    sum += x
+    sumSq += x * x
+  }
+  const mean = sum / n
+  const vrms = Math.sqrt(sumSq / n)
+  const vpp = vmax - vmin
+
+  // Timing from mid-level crossings. A tiny amplitude (flat/DC) has no real crossings.
+  const mid = (vmax + vmin) / 2
+  let period: number | null = null
+  let freq: number | null = null
+  let duty: number | null = null
+  if (vpp > 1e-9) {
+    const rising: number[] = []
+    const falling: number[] = []
+    for (let i = 1; i < n; i++) {
+      if (v[i - 1] < mid && v[i] >= mid) rising.push(crossTime(v, i, mid, dt))
+      else if (v[i - 1] >= mid && v[i] < mid) falling.push(crossTime(v, i, mid, dt))
+    }
+    if (rising.length >= 2) {
+      // Average spacing between consecutive rising crossings → robust period estimate.
+      let span = 0
+      for (let k = 1; k < rising.length; k++) span += rising[k] - rising[k - 1]
+      period = span / (rising.length - 1)
+      freq = period > 0 ? 1 / period : null
+      // Duty: high-time over one full period, anchored on the first rising crossing.
+      const r0 = rising[0]
+      const fall = falling.find((t) => t > r0)
+      const r1 = rising[1]
+      if (fall !== undefined && r1 > r0) duty = (fall - r0) / (r1 - r0)
+    }
+  }
+  return { vpp, vmax, vmin, mean, vrms, freq, period, duty }
+}

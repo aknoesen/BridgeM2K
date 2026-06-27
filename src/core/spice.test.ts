@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { Simulation } from 'eecircuit-engine'
-import { normalizeResult, transferFunction } from './spice'
+import { normalizeResult, transferFunction, findCutoffHz, analyzeBode } from './spice'
 import { buildNetlist, type Circuit } from './netlist'
 
 const rc: Circuit = {
@@ -206,4 +206,102 @@ describe('supply current (PSU-2)', () => {
     const r = normalizeResult(await sim.runSim())
     expect(sourceCurrent(r, 'S1')).toBeCloseTo(0.005, 4)
   }, 30000)
+})
+
+describe('findCutoffHz (LOOP-2 -3 dB cursor)', () => {
+  // Synthetic single-pole low-pass magnitude: |H| = 1/sqrt(1+(f/fc)^2) → -3.01 dB at f=fc.
+  function onePole(fc: number, fStart = 10, fStop = 1e6, ptsPerDec = 20) {
+    const decades = Math.log10(fStop / fStart)
+    const n = Math.round(decades * ptsPerDec) + 1
+    const freq = new Float64Array(n)
+    const magDb = new Float64Array(n)
+    for (let i = 0; i < n; i++) {
+      const f = fStart * Math.pow(10, (i / (n - 1)) * decades)
+      freq[i] = f
+      magDb[i] = -10 * Math.log10(1 + (f / fc) * (f / fc))
+    }
+    return { freq, magDb }
+  }
+
+  it('interpolates the cutoff to within 1% for several fc', () => {
+    for (const fc of [100, 1000, 15915, 100000]) {
+      const { freq, magDb } = onePole(fc)
+      const got = findCutoffHz(freq, magDb)
+      expect(got).not.toBeNull()
+      expect(Math.abs(got! - fc) / fc).toBeLessThan(0.01)
+    }
+  })
+
+  it('beats nearest-grid-point accuracy (interpolation matters at coarse pts/decade)', () => {
+    const fc = 2371 // deliberately between grid points at 5 pts/decade
+    const { freq, magDb } = onePole(fc, 10, 1e6, 5) // coarse: ~5 pts/decade
+    const interp = findCutoffHz(freq, magDb)!
+    // nearest grid point that first crosses -3 dB
+    let grid = NaN
+    const target = magDb[0] - 3
+    for (let i = 1; i < magDb.length; i++) if (magDb[i - 1] >= target && magDb[i] < target) { grid = freq[i]; break }
+    expect(Math.abs(interp - fc)).toBeLessThan(Math.abs(grid - fc))
+  })
+
+  it('returns null when the response never drops 3 dB (flat trace)', () => {
+    const freq = new Float64Array([10, 100, 1000, 10000])
+    const magDb = new Float64Array([0, 0, 0, 0])
+    expect(findCutoffHz(freq, magDb)).toBeNull()
+  })
+})
+
+describe('analyzeBode (general -3 dB feature)', () => {
+  // log-spaced magnitude sampler
+  function sample(fn: (f: number) => number, fStart = 10, fStop = 1e6, ptsPerDec = 100) {
+    const decades = Math.log10(fStop / fStart)
+    const n = Math.round(decades * ptsPerDec) + 1
+    const freq = new Float64Array(n)
+    const magDb = new Float64Array(n)
+    for (let i = 0; i < n; i++) {
+      const f = fStart * Math.pow(10, (i / (n - 1)) * decades)
+      freq[i] = f
+      magDb[i] = fn(f)
+    }
+    return { freq, magDb }
+  }
+  const lp = (fc: number) => (f: number) => -10 * Math.log10(1 + (f / fc) ** 2)
+  const hp = (fc: number) => (f: number) => -10 * Math.log10(1 + (fc / f) ** 2)
+  const bp = (f0: number, Q: number) => (f: number) => -10 * Math.log10(1 + (Q * (f / f0 - f0 / f)) ** 2)
+  const notch = (f0: number, Q: number) => (f: number) => -10 * Math.log10(1 + 1 / (Q * (f / f0 - f0 / f)) ** 2)
+
+  it('classifies a low-pass and reads fc', () => {
+    const { freq, magDb } = sample(lp(1000))
+    const r = analyzeBode(freq, magDb)
+    expect(r.shape).toBe('lowpass')
+    expect(Math.abs(r.cutoffs[0] - 1000) / 1000).toBeLessThan(0.02)
+  })
+
+  it('classifies a high-pass and reads fc', () => {
+    const { freq, magDb } = sample(hp(1000))
+    const r = analyzeBode(freq, magDb)
+    expect(r.shape).toBe('highpass')
+    expect(Math.abs(r.cutoffs[0] - 1000) / 1000).toBeLessThan(0.02)
+  })
+
+  it('classifies a band-pass with center ≈ f0 and two edges', () => {
+    const { freq, magDb } = sample(bp(1000, 5))
+    const r = analyzeBode(freq, magDb)
+    expect(r.shape).toBe('bandpass')
+    expect(r.cutoffs.length).toBe(2)
+    expect(Math.abs(r.center! - 1000) / 1000).toBeLessThan(0.03)
+    expect(r.bandwidth!).toBeGreaterThan(150)
+    expect(r.bandwidth!).toBeLessThan(260)
+  })
+
+  it('classifies a notch (band-stop) around f0', () => {
+    const { freq, magDb } = sample(notch(1000, 5))
+    const r = analyzeBode(freq, magDb)
+    expect(r.shape).toBe('bandstop')
+    expect(Math.abs(r.center! - 1000) / 1000).toBeLessThan(0.05)
+  })
+
+  it('reports flat / all-pass when nothing drops 3 dB', () => {
+    const { freq, magDb } = sample(() => 0)
+    expect(analyzeBode(freq, magDb).shape).toBe('flat')
+  })
 })

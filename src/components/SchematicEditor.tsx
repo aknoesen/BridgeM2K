@@ -8,6 +8,7 @@ import {
 } from '../core/schematic'
 import { buildNetlist } from '../core/netlist'
 import { createSpiceEngine, type SpiceEngine, transferFunction } from '../core/spice'
+import { UNIT, TUNE_RANGE, fmtEng, parseEng, tunePos, tuneValue } from '../core/units'
 import './Instrument.css'
 
 const GRID = 24
@@ -35,25 +36,10 @@ const TOOLS: { tool: Tool; label: string }[] = [
   { tool: 'ground', label: 'GND' },
 ]
 
-const UNIT: Partial<Record<SchKind, string>> = { resistor: 'Ω', capacitor: 'F', inductor: 'H', dcrail: 'V', inamp: 'V/V', inamp3: 'V/V' }
+// UNIT, TUNE_RANGE, fmtEng, parseEng, tunePos, tuneValue now live in core/units.ts (shared
+// with the Network Analyzer tune knobs). DEFAULT_VALUE stays here — it is editor-only.
 const DEFAULT_VALUE: Partial<Record<SchKind, number>> = {
   resistor: 1000, capacitor: 100e-9, inductor: 1e-3, dcrail: 5, vplus: 5, vminus: -5, inamp: 10, inamp3: 10,
-}
-
-// Parse engineering notation like "1k", "159n", "4.7u" → number.
-function parseEng(s: string): number | undefined {
-  const m = /^\s*(-?[\d.]+)\s*([pnumµkMG]?)\s*$/.exec(s)
-  if (!m) return undefined
-  const mult: Record<string, number> = {
-    p: 1e-12, n: 1e-9, u: 1e-6, µ: 1e-6, m: 1e-3, '': 1, k: 1e3, M: 1e6, G: 1e9,
-  }
-  return parseFloat(m[1]) * mult[m[2]]
-}
-function fmtEng(x: number): string {
-  if (x === 0) return '0'
-  const units = [['G', 1e9], ['M', 1e6], ['k', 1e3], ['', 1], ['m', 1e-3], ['u', 1e-6], ['n', 1e-9], ['p', 1e-12]] as const
-  for (const [suf, mul] of units) if (Math.abs(x) >= mul) return `${+(x / mul).toFixed(3)}${suf}`
-  return String(x)
 }
 
 // Reference designators (R1, C2, L1, U1 for op/in-amps, V1). A new part increments from the
@@ -293,6 +279,12 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
     setSch((s) => ({ ...s, components: s.components.map((c) => c.id === sel.id ? { ...c, value: v } : c) }))
   }
 
+  // LOOP-2: live numeric setter for the tune slider (no string round-trip), drives a debounced re-sim.
+  function setSelValueNum(v: number) {
+    if (!sel) return
+    setSch((s) => ({ ...s, components: s.components.map((c) => c.id === sel.id ? { ...c, value: v } : c) }))
+  }
+
   const px = (g: number) => g * GRID + PAD
 
   return (
@@ -401,12 +393,23 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
             {UNIT[sel.kind] && (
               <div className="control-row-inline">
                 <label>Value ({UNIT[sel.kind]})</label>
-                <input type="text" defaultValue={fmtEng(sel.value ?? 0)} key={sel.id}
+                <input type="text" defaultValue={fmtEng(sel.value ?? 0)} key={sel.id + ':' + (sel.value ?? 0)}
                   onBlur={(e) => setSelValue(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
                   style={{ width: 80 }} />
               </div>
             )}
+            {TUNE_RANGE[sel.kind] && (() => {
+              const [lo, hi] = TUNE_RANGE[sel.kind]!
+              return (
+                <div className="control-row-inline" title="Drag to tune live — the Bode/scope update as you go">
+                  <label>Tune</label>
+                  <input type="range" min={0} max={1000} value={tunePos(sel.value ?? lo, lo, hi)}
+                    onChange={(e) => setSelValueNum(tuneValue(Number(e.target.value), lo, hi))}
+                    style={{ width: 90 }} />
+                </div>
+              )
+            })()}
           </div>
         ) : selectedWire !== null ? (
           <div style={{ fontSize: 11, color: 'var(--accent-blue)' }}>Wire selected — press Delete to remove</div>

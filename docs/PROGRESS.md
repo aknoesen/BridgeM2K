@@ -36,6 +36,169 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-26 — BODE-GEN: topology-aware −3 dB readout (de-specialize the loop) — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**Why:** andre flagged that the −3 dB / fc readout silently assumed an RC low-pass (it measured
+3 dB down from the *DC* gain). For a high-pass it showed "—"; for a band-pass/notch it was
+meaningless. The knobs were already general; the readout was the over-fit part.
+
+**What I did:**
+- `core/spice.ts`: `analyzeBode(freq, magDb): BodeFeature` — measures −3 dB relative to the **peak**
+  gain and classifies by where the in-band region sits: low-pass / high-pass (1 cutoff), band-pass
+  (2 edges + geometric center + bandwidth), band-stop/notch (2 edges flanking the dip), or flat /
+  all-pass (no feature). All crossings interpolated in log-frequency. `findCutoffHz` kept for back-compat.
+- `core/spice.test.ts` (+5 tests): synthetic LP/HP/BP/notch/flat magnitudes classify correctly and
+  the edges/centers land within ~2–5 %.
+- `NetworkAnalyzer.tsx`: replaced the low-pass-only `findCutoff` with `analyzeBode`. The plot now draws
+  a dotted marker at *each* −3 dB crossing, the in-plot annotation reads "LP/HP fc ≈ …" or "BP/Notch
+  f0 ≈ …", and the marker-table shows the shape label + the relevant freq(s) (BP also shows the band +
+  BW). Flat responses read "no −3 dB feature" instead of a bogus number.
+
+**Verification (Definition of Done):**
+- build clean: yes. 12-bit floor: holds (signal path untouched).
+- tests: **57 passed (52 prior + 5 analyzeBode)**.
+
+**State for the next session:**
+- The Network Analyzer is now a general filter explorer (LP/HP/BP/notch), not an RC-low-pass demo.
+  Drag the tune knobs on any of those and the shape label + edges update live.
+- `analyzeBode` is the canonical Bode-feature finder; prefer it over `findCutoffHz` for UI. Notch
+  detection uses the deepest-dip heuristic — fine for single notches; a multi-notch response would
+  report the deepest one.
+
+---
+
+### 2026-06-26 — NA-TUNE: tune knobs inside the Network Analyzer (LOOP-2 follow-on) — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**Why:** the LOOP-2 tune slider lived in the Schematic Editor, but split view is hardcoded to
+Signal Gen + Spectrum, so the slider and the Bode plot could never be on screen together (andre
+flagged this). Chosen fix (option A): put the tuning knobs **inside the Network Analyzer**, next to
+the curve, so "turn knob → watch fc move" happens in one panel with no layout juggling.
+
+**What I did:**
+- `core/units.ts` (new): single source of truth for `UNIT`, `TUNE_RANGE`, `fmtEng`, `parseEng`, and
+  the log-slider mapping `tunePos`/`tuneValue` (+ `TUNE_STEPS`). No React.
+- `core/units.test.ts` (new, 5 tests): eng-notation parse/format, slider position↔value round-trip
+  (<1% in log space), clamping at the ends, monotonicity.
+- `SchematicEditor.tsx`: removed its local copies of those helpers and imports them from `core/units`
+  (the editor slider now uses `tunePos`/`tuneValue` too) — no behaviour change, just de-duplicated.
+- `NetworkAnalyzer.tsx`: new `Tunable` type + `tunables?`/`onTune?` props; a **"Tune (live)"** section
+  in the settings panel renders a log slider per R/C/L of the drawn circuit, labelled with refdes +
+  current value. Dragging calls `onTune` → updates the schematic → `drawn` re-derives → the debounced
+  AC sweep re-runs → the Bode curve + interpolated fc move live.
+- `App.tsx`: derives `tunables` from the schematic's R/C/L and passes `onTune = tuneComponent`
+  (updates a component's value by id). One source of truth (the schematic); the editor slider and the
+  NA knobs both drive it and stay in sync.
+
+**Verification (Definition of Done):**
+- build clean: yes. 12-bit floor: holds (signal path untouched).
+- tests: **52 passed (47 prior + 5 units)**.
+
+**State for the next session:**
+- Live tuning now works from inside the Network Analyzer — the headline RC moment is reachable in one
+  panel. The editor slider still exists for editing on the schematic.
+- The layout limitation remains (split view is still the fixed Signal Gen + Spectrum pair). If a
+  side-by-side editor+Bode is wanted later, that is the Track E preset-layout work (option B).
+- `core/units.ts` is now the home for unit/tune helpers; reuse it rather than re-defining.
+
+---
+
+### 2026-06-26 — LOOP-2: live tuning + interpolated −3 dB cursor — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**What I did:**
+- `core/spice.ts`: `findCutoffHz(freq, magDb)` — the −3 dB cutoff relative to the passband gain,
+  **interpolated in log-frequency** so the reading is not quantized to the sweep grid. Returns null
+  when the response never drops 3 dB.
+- `core/spice.test.ts` (+3 engine-free tests): cutoff within 1% for fc ∈ {100, 1k, 15.915k, 100k};
+  interpolation beats the nearest-grid-point at a coarse 5 pts/decade (fc=2371, between grid points);
+  flat trace → null.
+- `components/NetworkAnalyzer.tsx`: now uses the core `findCutoffHz` (replacing the local grid-point
+  version), and the AC sweep effect is **debounced 250 ms** so dragging a value coalesces to one sweep
+  after the last edit (no worker spam, no jank). The cutoff marker line + `fc ≈ …` annotation +
+  marker-table readout from NET-1 stay, now reading the interpolated value.
+- `components/SchematicEditor.tsx`: a **live-tune log slider** in the Selected panel for R/C/L
+  (`TUNE_RANGE`: R 1 Ω–1 MΩ, C 1 pF–10 µF, L 1 µH–1 H). Dragging calls `setSelValueNum` → updates the
+  schematic → `drawn` recomputes → both the transient feed (already debounced 250 ms in App) and the
+  AC sweep (now debounced) re-run live. The numeric Value field is keyed on the value so it reflects
+  the dragged number; exact entry via the field still works (commits on blur/Enter).
+
+**Verification (Definition of Done):**
+- build clean: yes (`tsc && vite build` ✓).
+- 12-bit spectrum floor at −104 dBFS: holds — `core/signal.ts` and the spectrum path untouched.
+- math sanity: findCutoffHz tests green. Full suite **47 passed (44 prior + 3 new)**.
+
+**State for the next session:**
+- Live tuning works end-to-end: drag R or C, watch the Bode cutoff (and the scope output) move, with
+  the fc readout interpolated. The transient path was already debounced (App, 250 ms); LOOP-2 added the
+  matching AC debounce + the slider + interpolation.
+- **Spec deviation (intentional):** the spec's "Transient/AC toggle with remembered settings per mode"
+  is **N/A under the LOOP-1 architecture decision** — Bode is its own instrument (Network Analyzer,
+  always `.ac`) and time-domain is the Oscilloscope/Spectrum (always `.tran`), so there is no single
+  panel that switches modes. Per-instrument settings already persist in component-local state. Recorded
+  here rather than building a toggle that would contradict LOOP-1.
+- `findCutoff` in NetworkAnalyzer is now a thin wrapper over the core fn; could be inlined later.
+
+**Open questions / flags for andre:**
+- The tune slider covers R/C/L (the filter components). dcrail/in-amp gain still use the numeric field
+  only — say the word if you want sliders there too.
+- Same sandbox sync caveat as the OSC-5 entry applies (build/tests run on a corrected mirror; your real
+  files were edited directly and verified intact).
+
+---
+
+### 2026-06-26 — OSC-5: scope measurements + cursors — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**What I did:**
+- `core/scope.ts`: `measureTrace(v, dt)` → `ScopeMeasurements` { vpp, vmax, vmin, mean, vrms,
+  freq, period, duty }. Amplitude stats are exact (single pass). Timing comes from interpolated
+  mid-level crossings (same sub-sample technique as the trigger): period = mean spacing of rising
+  crossings, freq = 1/period, duty = high-time over one period anchored on the first rising
+  crossing. Timing fields are `null` when the window holds no full cycle (flat/DC), so no bogus
+  frequency is reported.
+- `core/scope.test.ts` (+4 tests, 7 total): 1 kHz/1 V sine → Vpp≈2, Vrms≈0.707, f≈1000, duty≈0.5;
+  1 kHz/1 V 50% square (10 full periods) → Vpp=2, Vrms=1, mean=0, f=1000, duty=0.5; flat 0.5 V →
+  null timing, mean 0.5; empty trace safe.
+- `components/Oscilloscope.tsx`: a "Measure" settings section with two toggles. Measurements render
+  as a `.marker-table` overlay (CH1 + CH2 rows: Vpp, Vrms, mean, f, duty), computed in the render
+  effect over the **full-resolution** captured window (`signal.x.subarray(startIdx, startIdx+winSamples)`,
+  dt = 1/Fs) — not the downsampled display trace, so freq/duty stay accurate. Cursors: two time
+  (magenta) + two voltage (teal) lines as Plotly shapes, moved by range sliders; on-screen readout of
+  Δt, 1/Δt, ΔV (ΔV scaled by CH1 volts/div). Two new local color consts CURSOR_T_COLOR/CURSOR_V_COLOR.
+
+**Verification (Definition of Done):**
+- build clean: yes (`tsc && vite build` ✓, no new any/ts-ignore)
+- 12-bit spectrum floor at −104 dBFS confirmed: yes — `core/signal.ts` and the spectrum path are
+  untouched; the canary holds by construction.
+- math sanity check: measureTrace tests green. Sine Vrms 0.7071 vs A/√2=0.7071; square Vrms 1.000
+  vs A=1.000; both f=1000.0 Hz; duty 0.500. Full suite: **44 passed (40 prior + 4 new)**.
+
+**State for the next session:**
+- The scope now has Scopy-style measurements + cursors. `measureTrace` is a reusable pure core fn
+  (could feed a guided-discovery "measure the −3 dB bandwidth" prompt later).
+- Cursors are slider-driven (stepped), per spec's "stepped acceptable, draggable preferred." A future
+  polish could make them draggable via Plotly editable shapes + a `plotly_relayout` listener.
+- ΔV references CH1 volts/div only; if a per-cursor channel target is wanted, add a small selector.
+
+**Open questions / flags for andre:**
+- Sandbox note (not a code issue): the bash mount served a **stale copy** of the repo this session
+  (file-tool writes didn't appear in bash, and an earlier checksum-rsync from the stale mount briefly
+  clobbered the build copy's `breadboard.ts`/`breadboard.test.ts`). Your real files were never
+  affected — verified intact via the file tools — and the build/tests were run on a corrected copy.
+  Flagging in case the cross-session sync needs a look.
+
+---
+
 ### 2026-06-26 — OSC-3: scope edge trigger + capture-phase — DONE
 
 **By:** Claude Code session (in Cowork)

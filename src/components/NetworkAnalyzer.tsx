@@ -5,9 +5,14 @@
 // supply a drawn circuit it sweeps a default RC low-pass. See docs/specs/schematic-ngspice.md.
 import { useEffect, useRef, useState } from 'react'
 import Plotly from 'plotly.js-dist-min'
-import { createSpiceEngine, SpiceEngine, transferFunction, type SimResult } from '../core/spice'
+import { createSpiceEngine, SpiceEngine, transferFunction, analyzeBode, type BodeFeature, type FilterShape, type SimResult } from '../core/spice'
 import { buildNetlist, type Circuit } from '../core/netlist'
+import { type SchKind } from '../core/schematic'
+import { UNIT, TUNE_RANGE, fmtEng, tunePos, tuneValue } from '../core/units'
 import './Instrument.css'
+
+// A component the student can tune live from the Bode panel (R/C/L of the drawn circuit).
+export interface Tunable { id: string; kind: SchKind; value: number }
 
 // Default device under test: RC low-pass, fc = 1/(2*pi*1k*159.155n) ≈ 1000 Hz.
 const DEFAULT_CIRCUIT: Circuit = {
@@ -38,6 +43,9 @@ interface Props {
   dutName?: string
   // SPICE node each scope probe is wired to (from toCircuit). ch1 defaults to 'out'.
   probes?: { ch1?: string; ch2?: string }
+  // Live tuning (NA-TUNE): the drawn circuit's R/C/L + a callback to change a value by id.
+  tunables?: Tunable[]
+  onTune?: (id: string, value: number) => void
   compact?: boolean
 }
 
@@ -54,16 +62,37 @@ function bodeFor(res: SimResult, node: string): BodeData | null {
   }
 }
 
-// -3 dB cutoff relative to the low-frequency gain.
-function findCutoff(b: BodeData): number | null {
-  const ref = b.magDb[0]
-  for (let i = 1; i < b.magDb.length; i++) {
-    if (b.magDb[i - 1] >= ref - 3 && b.magDb[i] < ref - 3) return b.freq[i]
+// Topology-aware −3 dB readout (BODE-GEN). Classification + interpolation live in core
+// (analyzeBode); these are just display helpers.
+function hzLabel(f: number): string {
+  return f >= 1e6 ? (f / 1e6).toFixed(3) + ' MHz' : f >= 1000 ? (f / 1000).toFixed(3) + ' kHz' : f.toFixed(1) + ' Hz'
+}
+const SHAPE_LABEL: Record<FilterShape, string> = {
+  lowpass: 'Low-pass', highpass: 'High-pass', bandpass: 'Band-pass', bandstop: 'Notch', flat: 'Flat / all-pass',
+}
+// Compact in-plot annotation, e.g. "LP  fc ≈ 1.00 kHz" or "BP  f0 ≈ 1.00 kHz".
+function bodeAnno(feat: BodeFeature): string {
+  const hz = (f: number) => (f >= 1e6 ? (f / 1e6).toFixed(2) + ' MHz' : f >= 1000 ? (f / 1000).toFixed(2) + ' kHz' : f.toFixed(0) + ' Hz')
+  switch (feat.shape) {
+    case 'lowpass': return `LP  fc ≈ ${hz(feat.cutoffs[0])}`
+    case 'highpass': return `HP  fc ≈ ${hz(feat.cutoffs[0])}`
+    case 'bandpass': return `BP  f0 ≈ ${hz(feat.center!)}`
+    case 'bandstop': return `Notch  f0 ≈ ${hz(feat.center!)}`
+    case 'flat': return 'flat'
   }
-  return null
+}
+// Marker-table readout: a key label + a detail string.
+function bodeReadout(feat: BodeFeature): { label: string; detail: string } {
+  switch (feat.shape) {
+    case 'lowpass': return { label: 'fc', detail: hzLabel(feat.cutoffs[0]) }
+    case 'highpass': return { label: 'fc', detail: hzLabel(feat.cutoffs[0]) }
+    case 'bandpass': return { label: 'f0', detail: `${hzLabel(feat.center!)}  (${hzLabel(feat.cutoffs[0])}–${hzLabel(feat.cutoffs[1])}, BW ${hzLabel(feat.bandwidth!)})` }
+    case 'bandstop': return { label: 'f0', detail: `${hzLabel(feat.center!)}  (${hzLabel(feat.cutoffs[0])}–${hzLabel(feat.cutoffs[1])})` }
+    case 'flat': return { label: '—', detail: 'no −3 dB feature' }
+  }
 }
 
-export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, probes, compact }: Props) {
+export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, probes, tunables, onTune, compact }: Props) {
   const magRef = useRef<HTMLDivElement>(null)
   const phaseRef = useRef<HTMLDivElement>(null)
   const engineRef = useRef<SpiceEngine | null>(null)
@@ -115,8 +144,12 @@ export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, pr
     return () => { engineRef.current?.dispose(); engineRef.current = null }
   }, [])
 
-  // Run a sweep on mount and whenever the sweep settings or circuit change.
-  useEffect(() => { void runSweep() // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Run a sweep on mount and whenever the sweep settings or circuit change. Debounced so
+  // dragging a component value (LOOP-2 live tuning) coalesces to one sweep after the last edit.
+  useEffect(() => {
+    const h = setTimeout(() => { void runSweep() }, 250)
+    return () => clearTimeout(h)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fStart, fStop, pointsPerDecade, circuit, probes])
 
   // If CH2 isn't available (no 2+ probe), fall back to CH1.
@@ -128,13 +161,14 @@ export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, pr
     const showCh1 = (channel === 'ch1' || channel === 'both') && !!bode1
     const showCh2 = (channel === 'ch2' || channel === 'both') && !!bode2
     const primary = channel === 'ch2' ? bode2 : (bode1 ?? bode2)
-    const cutoff = primary ? findCutoff(primary) : null
+    const feat = primary ? analyzeBode(primary.freq, primary.magDb) : null
 
     const logRange: [number, number] = [Math.log10(fStart), Math.log10(fStop)]
-    const cutoffShape = cutoff
-      ? [{ type: 'line' as const, x0: cutoff, x1: cutoff, yref: 'paper' as const, y0: 0, y1: 1,
-           line: { color: '#888', width: 1, dash: 'dot' as const } }]
-      : []
+    // A dotted marker at each −3 dB crossing (1 for LP/HP, 2 for BP/notch, none for flat).
+    const cutoffShape = (feat?.cutoffs ?? []).map((f) => ({
+      type: 'line' as const, x0: f, x1: f, yref: 'paper' as const, y0: 0, y1: 1,
+      line: { color: '#888', width: 1, dash: 'dot' as const },
+    }))
 
     const baseX = {
       type: 'log' as const, range: logRange, gridcolor: '#2a2a2a', zerolinecolor: '#444',
@@ -163,8 +197,9 @@ export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, pr
         line: { color: CH2_COLOR, width: 2.5 }, hoverinfo: 'none' } as Plotly.Data)
     }
 
-    const cutoffAnno = cutoff ? [{ x: Math.log10(cutoff), y: magMin + (magMax - magMin) * 0.12,
-      text: `fc ≈ ${cutoff >= 1000 ? (cutoff / 1000).toFixed(2) + ' kHz' : cutoff.toFixed(0) + ' Hz'}`,
+    const annoF = feat && feat.shape !== 'flat' ? (feat.center ?? feat.cutoffs[0]) : null
+    const cutoffAnno = feat && annoF ? [{ x: Math.log10(annoF), y: magMin + (magMax - magMin) * 0.12,
+      text: bodeAnno(feat),
       showarrow: false, font: { size: 10, color: '#fff' }, bgcolor: 'rgba(40,40,40,0.9)',
       bordercolor: '#666', borderwidth: 1 }] : []
 
@@ -186,7 +221,8 @@ export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, pr
   }, [bode1, bode2, channel, magMin, magMax, phaseMin, phaseMax, fStart, fStop])
 
   const primaryBode = channel === 'ch2' ? bode2 : (bode1 ?? bode2)
-  const fc = primaryBode ? findCutoff(primaryBode) : null
+  const feat = primaryBode ? analyzeBode(primaryBode.freq, primaryBode.magDb) : null
+  const readout = feat ? bodeReadout(feat) : { label: '—', detail: '—' }
 
   return (
     <div className="instrument-panel">
@@ -205,11 +241,9 @@ export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, pr
         </div>
         <div className="marker-table">
           <div className="marker-row">
-            <span className="marker-id">fc</span>
-            <span className="marker-freq">
-              {fc ? (fc >= 1000 ? (fc / 1000).toFixed(3) + ' kHz' : fc.toFixed(1) + ' Hz') : '—'}
-            </span>
-            <span className="marker-type">-3 dB ({channel === 'ch2' ? 'CH2' : 'CH1'})</span>
+            <span className="marker-id">{readout.label}</span>
+            <span className="marker-freq">{readout.detail}</span>
+            <span className="marker-type">{feat ? SHAPE_LABEL[feat.shape] : 'no sweep'} ({channel === 'ch2' ? 'CH2' : 'CH1'})</span>
           </div>
         </div>
       </div>
@@ -224,6 +258,28 @@ export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, pr
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4 }}>
           {bode2 ? 'CH1 = 1+ node, CH2 = 2+ node (both vs W1 input).' : 'Wire a 2+ probe to compare a second node.'}
         </div>
+
+        {onTune && tunables && tunables.some((t) => TUNE_RANGE[t.kind]) && (
+          <>
+            <div className="section-title" style={{ color: 'var(--theory-color)' }}>Tune (live)</div>
+            {tunables.filter((t) => TUNE_RANGE[t.kind]).map((t) => {
+              const [lo, hi] = TUNE_RANGE[t.kind]!
+              return (
+                <div key={t.id} className="control-row-inline" title="Drag to sweep this value — the Bode curve follows">
+                  <label style={{ minWidth: 70 }}>
+                    {t.id} <span style={{ color: 'var(--text-secondary)' }}>{fmtEng(t.value)}{UNIT[t.kind]}</span>
+                  </label>
+                  <input type="range" min={0} max={1000} value={tunePos(t.value, lo, hi)}
+                    onChange={(e) => onTune(t.id, tuneValue(Number(e.target.value), lo, hi))}
+                    style={{ width: 80 }} />
+                </div>
+              )
+            })}
+            <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4 }}>
+              Drag a knob and watch fc move. Same values as the Circuit editor.
+            </div>
+          </>
+        )}
 
         <div className="section-title">Sweep</div>
         <div className="control-row-inline">

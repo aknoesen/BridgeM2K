@@ -21,7 +21,7 @@ Spec: `docs/specs/oscilloscope.md`
 | OSC-2 | Second channel (CH2) + per-channel vertical controls | OSC-1 | DONE |
 | OSC-3 | Edge trigger engine (source/level/slope, auto/normal/single) | OSC-2 | DONE |
 | OSC-4 | Holdoff + pulse/width trigger + single-shot capture (parity) | OSC-3 | TODO |
-| OSC-5 | Measurements panel + cursors (Vpp, Vrms, freq, period, duty) | OSC-3 | TODO |
+| OSC-5 | Measurements panel + cursors (Vpp, Vrms, freq, period, duty) | OSC-3 | DONE |
 
 ## Track B — Schematic editor + NGSpice WASM (the circuit loop)
 
@@ -36,7 +36,7 @@ Spec: `docs/specs/schematic-ngspice.md`
 | SCH-3 | Save/Load circuit (download/open `.json` + localStorage autosave) | SCH-1 | DONE |
 | NET-1 | Network Analyzer instrument (Bode mag+phase, sine-sweep via ngspice `.ac`) | SPICE-2 | DONE |
 | LOOP-1 | Close the loop: generator → circuit → Network Analyzer (AC Bode) + Scope CH2 (transient) | SCH-2, OSC-2, NET-1 | DONE |
-| LOOP-2 | Live value tuning + transient/AC toggle + −3 dB cursor | LOOP-1 | TODO |
+| LOOP-2 | Live value tuning + transient/AC toggle + −3 dB cursor | LOOP-1 | DONE |
 | KICAD-1 | (Stretch) KiCad netlist import | LOOP-1 | TODO |
 
 Notes:

@@ -86,3 +86,23 @@
 .instrument-area.split > * + * {
   border-left: 2px solid #222;
 }
+
+/* License / credit badge — subtle, bottom-right, click-through except the link */
+.license-badge {
+  position: fixed;
+  right: 12px;
+  bottom: 6px;
+  z-index: 50;
+  font-size: 10px;
+  color: var(--text-secondary);
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
+}
+.license-badge a {
+  color: inherit;
+  text-decoration: none;
+  pointer-events: auto;
+}
+.license-badge:hover { opacity: 0.95; }
+.license-badge a:hover { text-decoration: underline; }

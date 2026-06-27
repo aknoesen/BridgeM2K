@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Plotly from 'plotly.js-dist-min'
 import { SignalParams } from '../core/signal'
-import { captureWindow, SCOPE_H_DIVS, SCOPE_V_DIVS } from '../core/scope'
+import { captureWindow, measureTrace, SCOPE_H_DIVS, SCOPE_V_DIVS, type ScopeMeasurements } from '../core/scope'
 import { findEdgeTrigger, nextTriggerState, type Slope, type TriggerMode } from '../core/trigger'
 import './Instrument.css'
 
@@ -34,6 +34,13 @@ const VOLTS_PER_DIV: { label: string; value: number }[] = [
 const CH1_COLOR = '#f0a030'
 const CH2_COLOR = '#40c0e0'
 const TRIG_COLOR = '#dddd44'
+const CURSOR_T_COLOR = '#e060c0' // time cursors (magenta)
+const CURSOR_V_COLOR = '#60e0c0' // voltage cursors (teal)
+
+const fmtV = (v: number) => (Math.abs(v) < 1 ? `${(v * 1000).toFixed(0)} mV` : `${v.toFixed(3)} V`)
+const fmtF = (f: number | null) => (f == null ? '—' : f >= 1000 ? `${(f / 1000).toFixed(3)} kHz` : `${f.toFixed(1)} Hz`)
+const fmtT = (s: number | null) => (s == null ? '—' : s < 1e-3 ? `${(s * 1e6).toFixed(1)} µs` : `${(s * 1e3).toFixed(3)} ms`)
+const fmtD = (d: number | null) => (d == null ? '—' : `${(d * 100).toFixed(1)} %`)
 
 export default function Oscilloscope({ params, signal, signal2, params2, running, compact, onRunToggle, onParams2Change }: Props) {
   const plotRef = useRef<HTMLDivElement>(null)
@@ -55,12 +62,28 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
   const [singleArmed, setSingleArmed] = useState(true)
   const [trigStatus, setTrigStatus] = useState('Auto')
 
+  // Measurements + cursors (OSC-5)
+  const [showMeas, setShowMeas] = useState(true)
+  const [meas1, setMeas1] = useState<ScopeMeasurements | null>(null)
+  const [meas2, setMeas2] = useState<ScopeMeasurements | null>(null)
+  const [showCursors, setShowCursors] = useState(false)
+  const [cx1, setCx1] = useState(2) // time cursor 1 (ms)
+  const [cx2, setCx2] = useState(8) // time cursor 2 (ms)
+  const [cy1, setCy1] = useState(1) // voltage cursor 1 (divisions)
+  const [cy2, setCy2] = useState(-1) // voltage cursor 2 (divisions)
+
+  const windowMsR = SCOPE_H_DIVS * timePerDiv * 1000
+  const halfR = SCOPE_V_DIVS / 2
+  const dt = Math.abs(cx2 - cx1) / 1000 // seconds
+  const dvVolts = Math.abs(cy2 - cy1) * ch1VoltsPerDiv
+
   useEffect(() => {
     if (!plotRef.current) return
     const el = plotRef.current
     if (!signal) {
       if (initialised.current) Plotly.purge(el)
       initialised.current = false
+      setMeas1(null); setMeas2(null)
       return
     }
 
@@ -105,6 +128,12 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
       })
     }
 
+    // Measurements over the full-resolution captured window (not the downsampled trace).
+    const winSamples = Math.round(windowSec * Fs)
+    const startIdx = Math.max(0, Math.round(offsetSec * Fs))
+    setMeas1(measureTrace(signal.x.subarray(startIdx, startIdx + winSamples), 1 / Fs))
+    setMeas2(ch2Enabled && signal2 ? measureTrace(signal2.x.subarray(startIdx, startIdx + winSamples), 1 / Fs) : null)
+
     // Trigger level marker (on the source channel's scaling) + centre alignment line when triggered.
     const srcVpd = trigSource === 'ch2' ? ch2VoltsPerDiv : ch1VoltsPerDiv
     const srcOff = trigSource === 'ch2' ? ch2Offset : ch1Offset
@@ -114,6 +143,14 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
     ]
     if (decision.show === 'triggered') {
       shapes.push({ type: 'line', xref: 'x', yref: 'paper', x0: windowMs / 2, x1: windowMs / 2, y0: 0, y1: 1, line: { color: TRIG_COLOR, width: 1, dash: 'dot' } })
+    }
+    if (showCursors) {
+      shapes.push(
+        { type: 'line', xref: 'x', yref: 'paper', x0: cx1, x1: cx1, y0: 0, y1: 1, line: { color: CURSOR_T_COLOR, width: 1 } },
+        { type: 'line', xref: 'x', yref: 'paper', x0: cx2, x1: cx2, y0: 0, y1: 1, line: { color: CURSOR_T_COLOR, width: 1 } },
+        { type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: cy1, y1: cy1, line: { color: CURSOR_V_COLOR, width: 1 } },
+        { type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: cy2, y1: cy2, line: { color: CURSOR_V_COLOR, width: 1 } },
+      )
     }
 
     const layout: Partial<Plotly.Layout> = {
@@ -131,7 +168,8 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
     else Plotly.react(el, data, layout, config)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signal, signal2, ch2Enabled, timePerDiv, ch1VoltsPerDiv, ch1Offset, ch2VoltsPerDiv, ch2Offset,
-      params.samplingRate, trigSource, trigLevel, trigSlope, trigMode, singleArmed, running])
+      params.samplingRate, trigSource, trigLevel, trigSlope, trigMode, singleArmed, running,
+      showCursors, cx1, cx2, cy1, cy2])
 
   const statusColor = trigStatus.startsWith('Trig') ? TRIG_COLOR : trigStatus === 'Auto' ? '#88dd88' : 'var(--text-secondary)'
 
@@ -151,6 +189,36 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
           </div>
         </div>
         <div ref={plotRef} className="plotly-display" />
+        {showMeas && meas1 && (
+          <div className="marker-table">
+            <div className="marker-row">
+              <span className="marker-id" style={{ color: CH1_COLOR }}>CH1</span>
+              <span>Vpp {fmtV(meas1.vpp)}</span>
+              <span>Vrms {fmtV(meas1.vrms)}</span>
+              <span>mean {fmtV(meas1.mean)}</span>
+              <span>f {fmtF(meas1.freq)}</span>
+              <span>D {fmtD(meas1.duty)}</span>
+            </div>
+            {ch2Enabled && meas2 && (
+              <div className="marker-row">
+                <span className="marker-id" style={{ color: CH2_COLOR }}>CH2</span>
+                <span>Vpp {fmtV(meas2.vpp)}</span>
+                <span>Vrms {fmtV(meas2.vrms)}</span>
+                <span>mean {fmtV(meas2.mean)}</span>
+                <span>f {fmtF(meas2.freq)}</span>
+                <span>D {fmtD(meas2.duty)}</span>
+              </div>
+            )}
+            {showCursors && (
+              <div className="marker-row" style={{ marginTop: 2 }}>
+                <span className="marker-id" style={{ color: CURSOR_T_COLOR }}>⇿</span>
+                <span style={{ color: CURSOR_T_COLOR }}>Δt {fmtT(dt)}</span>
+                <span style={{ color: CURSOR_T_COLOR }}>1/Δt {fmtF(cx2 !== cx1 ? 1 / dt : null)}</span>
+                <span style={{ color: CURSOR_V_COLOR }}>ΔV {fmtV(dvVolts)}</span>
+              </div>
+            )}
+          </div>
+        )}
         {!running && <div className="display-overlay">Stopped — press Run to acquire</div>}
       </div>
 
@@ -196,6 +264,39 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.5 }}>
           Auto free-runs (scrolls) without a trigger; Normal holds; Single captures one frame then stops.
         </div>
+
+        <div className="section-title">Measure</div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, marginBottom: 4 }}>
+          <input type="checkbox" checked={showMeas} onChange={(e) => setShowMeas(e.target.checked)} />
+          <span>Measurements (Vpp, Vrms, mean, f, duty)</span>
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, marginBottom: 6 }}>
+          <input type="checkbox" checked={showCursors} onChange={(e) => setShowCursors(e.target.checked)} />
+          <span>Cursors</span>
+        </label>
+        {showCursors && (
+          <>
+            <div className="control-row-inline">
+              <label style={{ color: CURSOR_T_COLOR }}>t1 (ms)</label>
+              <input type="range" min={0} max={windowMsR} step={windowMsR / 200} value={cx1} onChange={(e) => setCx1(Number(e.target.value))} style={{ width: 90 }} />
+            </div>
+            <div className="control-row-inline">
+              <label style={{ color: CURSOR_T_COLOR }}>t2 (ms)</label>
+              <input type="range" min={0} max={windowMsR} step={windowMsR / 200} value={cx2} onChange={(e) => setCx2(Number(e.target.value))} style={{ width: 90 }} />
+            </div>
+            <div className="control-row-inline">
+              <label style={{ color: CURSOR_V_COLOR }}>v1 (div)</label>
+              <input type="range" min={-halfR} max={halfR} step={0.05} value={cy1} onChange={(e) => setCy1(Number(e.target.value))} style={{ width: 90 }} />
+            </div>
+            <div className="control-row-inline">
+              <label style={{ color: CURSOR_V_COLOR }}>v2 (div)</label>
+              <input type="range" min={-halfR} max={halfR} step={0.05} value={cy2} onChange={(e) => setCy2(Number(e.target.value))} style={{ width: 90 }} />
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.5 }}>
+              Δt / 1/Δt from the two time cursors; ΔV from the two voltage cursors (scaled by CH1 volts/div). Readout in the on-screen table.
+            </div>
+          </>
+        )}
 
         <div className="section-title" style={{ color: CH1_COLOR }}>CH1</div>
         <div className="control-row-inline">

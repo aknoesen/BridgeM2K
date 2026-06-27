@@ -10,12 +10,14 @@ import Oscilloscope from './components/Oscilloscope'
 import NetworkAnalyzer from './components/NetworkAnalyzer'
 import SchematicEditor from './components/SchematicEditor'
 import Breadboard from './components/Breadboard'
+import About from './components/About'
+import Welcome from './components/Welcome'
 import { type BoardLayout } from './core/breadboard'
 import Voltmeter from './components/Voltmeter'
 import PowerSupply from './components/PowerSupply'
 import './App.css'
 
-type ActiveInstrument = 'siggen' | 'spectrum' | 'scope' | 'network' | 'schematic' | 'voltmeter' | 'psu' | 'breadboard'
+type ActiveInstrument = 'siggen' | 'spectrum' | 'scope' | 'network' | 'schematic' | 'voltmeter' | 'psu' | 'breadboard' | 'about'
 type LayoutMode = 'single' | 'split'
 
 const DEFAULT_PARAMS: SignalParams = {
@@ -68,6 +70,9 @@ function loadStoredBoard(): BoardLayout {
 
 export default function App() {
   const [active, setActive] = useState<ActiveInstrument>('siggen')
+  const [entered, setEntered] = useState<boolean>(() => {
+    try { return localStorage.getItem('bm2k-welcomed') === '1' } catch { return false }
+  })
   const [layout, setLayout] = useState<LayoutMode>('single')
   const [params, setParams] = useState<SignalParams>(DEFAULT_PARAMS)
   const [params2, setParams2] = useState<SignalParams>(DEFAULT_PARAMS2)
@@ -124,6 +129,19 @@ export default function App() {
   const drawn = useMemo(() => toCircuit(schematic, 'Drawn circuit'), [schematic])
   const drawnValid = drawn.warnings.length === 0
 
+  // NA-TUNE: the drawn circuit's tunable parts (R/C/L) + a setter, so the Network Analyzer can
+  // host live tuning knobs next to the Bode plot. Editing here flows back into the schematic,
+  // which re-derives `drawn` and re-runs the (debounced) sweep.
+  const tunables = useMemo(
+    () => schematic.components
+      .filter((c) => c.kind === 'resistor' || c.kind === 'capacitor' || c.kind === 'inductor')
+      .map((c) => ({ id: c.id, kind: c.kind, value: c.value ?? 0 })),
+    [schematic],
+  )
+  function tuneComponent(id: string, value: number) {
+    setSchematic((s) => ({ ...s, components: s.components.map((c) => c.id === id ? { ...c, value } : c) }))
+  }
+
   // WIRE-3: drive the drawn circuit with the generator and read its output back into the
   // scope/spectrum. circuitOut holds the resampled 1+ node voltage; null when no valid circuit.
   const [circuitOut, setCircuitOut] = useState<Samples | null>(null)
@@ -177,10 +195,14 @@ export default function App() {
     </button>
   )
 
+  if (!entered) {
+    return <Welcome onEnter={() => { try { localStorage.setItem('bm2k-welcomed', '1') } catch { /* quota */ } setEntered(true) }} />
+  }
+
   return (
     <div className="app-shell">
       <nav className="nav-panel">
-        <div className="nav-logo">M2K</div>
+        <div className="nav-logo" onClick={() => setEntered(false)} title="Welcome" style={{ cursor: 'pointer' }}><img src={`${import.meta.env.BASE_URL}bridgem2k.svg`} alt="BridgeM2K" style={{ width: 48, height: 48, display: "block", margin: "0 auto" }} /></div>
         {navBtn('siggen', '⌇', <>Signal<br/>Gen</>, 'Signal Generator')}
         {navBtn('scope', '∿', 'Scope', 'Oscilloscope')}
         {navBtn('spectrum', '▲', 'Spectrum', 'Spectrum Analyzer')}
@@ -193,6 +215,12 @@ export default function App() {
         <button className={`nav-btn ${layout === 'split' ? 'nav-active' : ''}`}
           onClick={() => setLayout(l => l === 'split' ? 'single' : 'split')} title="Split view: Signal Gen + Spectrum">
           <span className="nav-icon">&#8863;</span><span className="nav-label">Split<br/>View</span>
+        </button>
+
+        <button className={`nav-btn ${active === 'about' && layout === 'single' ? 'nav-active' : ''}`}
+          style={{ marginTop: 'auto' }}
+          onClick={() => { setActive('about'); setLayout('single') }} title="About & licenses">
+          <span className="nav-icon">ⓘ</span><span className="nav-label">About</span>
         </button>
       </nav>
 
@@ -223,11 +251,15 @@ export default function App() {
             circuit={drawnValid ? drawn.circuit : undefined}
             dutName={drawnValid ? 'your drawn circuit' : undefined}
             probes={drawnValid ? drawn.probes : undefined}
+            tunables={tunables}
+            onTune={tuneComponent}
           />
         ) : layout === 'single' && active === 'voltmeter' ? (
           <Voltmeter circuit={drawn.circuit} w1={params} w2={params2} psu={psu} />
         ) : layout === 'single' && active === 'psu' ? (
           <PowerSupply psu={psu} onChange={setPsu} circuit={drawn.circuit} w1={params} w2={params2} />
+        ) : layout === 'single' && active === 'about' ? (
+          <About />
         ) : (
           <>
             {(layout === 'split' || active === 'siggen') && (

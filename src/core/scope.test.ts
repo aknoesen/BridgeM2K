@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { captureWindow, voltsAxisRange, SCOPE_H_DIVS } from './scope'
+import { captureWindow, voltsAxisRange, measureTrace, SCOPE_H_DIVS } from './scope'
 
 const Fs = 100000
 
@@ -8,6 +8,13 @@ function samples(n: number) {
   const x = new Float64Array(n)
   for (let i = 0; i < n; i++) { t[i] = i / Fs; x[i] = Math.sin((2 * Math.PI * 1000 * i) / Fs) }
   return { t, x }
+}
+
+// Ideal 50%-duty square, amplitude A, frequency f, sampled at Fs.
+function square(n: number, A = 1, f = 1000) {
+  const x = new Float64Array(n)
+  for (let i = 0; i < n; i++) { x[i] = ((i * f) / Fs) % 1 < 0.5 ? A : -A }
+  return x
 }
 
 describe('captureWindow', () => {
@@ -32,5 +39,46 @@ describe('captureWindow', () => {
   it('voltsAxisRange is symmetric ±(V_DIVS/2)*vpd', () => {
     expect(voltsAxisRange(0.5)).toEqual([-2, 2])
     expect(voltsAxisRange(1)).toEqual([-4, 4])
+  })
+})
+
+describe('measureTrace', () => {
+  it('measures a 1 kHz, 1 V sine (16 ms window)', () => {
+    const s = samples(1600).x
+    const m = measureTrace(s, 1 / Fs)
+    expect(m.vmax).toBeCloseTo(1, 2)
+    expect(m.vmin).toBeCloseTo(-1, 2)
+    expect(m.vpp).toBeCloseTo(2, 2)
+    expect(m.mean).toBeCloseTo(0, 3)
+    expect(m.vrms).toBeCloseTo(Math.SQRT1_2, 2) // 0.707
+    expect(m.freq).toBeCloseTo(1000, 0)
+    expect(m.period).toBeCloseTo(0.001, 5)
+    expect(m.duty).toBeCloseTo(0.5, 2)
+  })
+
+  it('measures a 1 kHz, 1 V, 50% square (10 ms window)', () => {
+    const s = square(1000, 1, 1000) // exactly 10 periods
+    const m = measureTrace(s, 1 / Fs)
+    expect(m.vpp).toBeCloseTo(2, 6)
+    expect(m.vrms).toBeCloseTo(1, 6)
+    expect(m.mean).toBeCloseTo(0, 6)
+    expect(m.freq).toBeCloseTo(1000, 0)
+    expect(m.duty).toBeCloseTo(0.5, 2)
+  })
+
+  it('returns null timing for a flat/DC trace', () => {
+    const s = new Float64Array(1000).fill(0.5)
+    const m = measureTrace(s, 1 / Fs)
+    expect(m.vpp).toBe(0)
+    expect(m.mean).toBeCloseTo(0.5, 9)
+    expect(m.freq).toBeNull()
+    expect(m.period).toBeNull()
+    expect(m.duty).toBeNull()
+  })
+
+  it('empty trace is safe', () => {
+    const m = measureTrace(new Float64Array(0), 1 / Fs)
+    expect(m.vpp).toBe(0)
+    expect(m.freq).toBeNull()
   })
 })

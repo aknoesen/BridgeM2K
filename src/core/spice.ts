@@ -168,6 +168,111 @@ export function transferFunction(r: SimResult, outName: string, inName: string):
   return { freq, magDb, phaseDeg }
 }
 
+// −3 dB cutoff relative to the low-frequency (passband) gain, interpolated in
+// log-frequency so the reading is not quantized to the sweep grid (LOOP-2). Returns
+// the first frequency where the magnitude falls 3 dB below magDb[0], or null if the
+// response never drops 3 dB across the swept range (e.g. a flat or rising trace).
+export function findCutoffHz(freq: ArrayLike<number>, magDb: ArrayLike<number>): number | null {
+  const n = magDb.length
+  if (n < 2) return null
+  const target = magDb[0] - 3
+  for (let i = 1; i < n; i++) {
+    if (magDb[i - 1] >= target && magDb[i] < target) {
+      const lf0 = Math.log10(freq[i - 1])
+      const lf1 = Math.log10(freq[i])
+      const frac = (target - magDb[i - 1]) / (magDb[i] - magDb[i - 1]) // 0..1 between the two points
+      return Math.pow(10, lf0 + frac * (lf1 - lf0))
+    }
+  }
+  return null
+}
+
+// Log-interpolated frequency where magDb crosses `target` between samples i-1 and i.
+function crossFreqLog(freq: ArrayLike<number>, magDb: ArrayLike<number>, i: number, target: number): number {
+  const a = magDb[i - 1]
+  const b = magDb[i]
+  const lf0 = Math.log10(freq[i - 1])
+  const lf1 = Math.log10(freq[i])
+  if (b === a) return Math.pow(10, lf0)
+  const frac = (target - a) / (b - a)
+  return Math.pow(10, lf0 + frac * (lf1 - lf0))
+}
+
+export type FilterShape = 'lowpass' | 'highpass' | 'bandpass' | 'bandstop' | 'flat'
+
+export interface BodeFeature {
+  shape: FilterShape
+  peakDb: number
+  peakFreq: number
+  // −3 dB crossing frequencies (ascending). LP/HP → 1; BP/notch → 2 (band edges); flat → 0.
+  cutoffs: number[]
+  center?: number     // geometric-mean band center (BP/notch)
+  bandwidth?: number  // upper − lower edge (BP/notch)
+}
+
+// General −3 dB feature finder (NA-TUNE). Measures relative to the PEAK gain (not the DC gain),
+// then classifies the response by where the in-band region (≥ peak − 3 dB) sits in the sweep:
+//   one band touching the low end  → low-pass   (1 cutoff)
+//   one band touching the high end → high-pass  (1 cutoff)
+//   one band touching neither end  → band-pass  (2 edges, center, bandwidth)
+//   two bands flanking a central dip → band-stop/notch (2 edges around the dip)
+//   band spans the whole sweep      → flat / all-pass (no −3 dB feature)
+// This makes the readout honest for any EEC1 filter rather than assuming an RC low-pass.
+export function analyzeBode(freq: ArrayLike<number>, magDb: ArrayLike<number>): BodeFeature {
+  const n = magDb.length
+  let pk = 0
+  for (let i = 1; i < n; i++) if (magDb[i] > magDb[pk]) pk = i
+  const peakDb = n ? magDb[pk] : 0
+  const peakFreq = n ? freq[pk] : 0
+  if (n < 2) return { shape: 'flat', peakDb, peakFreq, cutoffs: [] }
+
+  const target = peakDb - 3
+  // Contiguous runs of samples that are within 3 dB of the peak (the in-band regions).
+  const runs: [number, number][] = []
+  let s = -1
+  for (let i = 0; i < n; i++) {
+    const above = magDb[i] >= target
+    if (above && s < 0) s = i
+    if (s >= 0 && (!above || i === n - 1)) {
+      runs.push([s, above ? i : i - 1])
+      s = -1
+    }
+  }
+  const leftCross = (r: [number, number]) => (r[0] > 0 ? crossFreqLog(freq, magDb, r[0], target) : null)
+  const rightCross = (r: [number, number]) => (r[1] < n - 1 ? crossFreqLog(freq, magDb, r[1] + 1, target) : null)
+
+  if (runs.length <= 1) {
+    const r = runs[0] ?? [0, n - 1]
+    const lc = leftCross(r)
+    const rc = rightCross(r)
+    if (lc === null && rc === null) return { shape: 'flat', peakDb, peakFreq, cutoffs: [] }
+    if (lc === null && rc !== null) return { shape: 'lowpass', peakDb, peakFreq, cutoffs: [rc] }
+    if (lc !== null && rc === null) return { shape: 'highpass', peakDb, peakFreq, cutoffs: [lc] }
+    const lo = lc as number, hi = rc as number
+    return { shape: 'bandpass', peakDb, peakFreq, cutoffs: [lo, hi], center: Math.sqrt(lo * hi), bandwidth: hi - lo }
+  }
+
+  // ≥2 in-band runs: a notch sits between two pass regions. Use the runs flanking the deepest dip.
+  let mn = 0
+  for (let i = 1; i < n; i++) if (magDb[i] < magDb[mn]) mn = i
+  let before: [number, number] | null = null
+  let after: [number, number] | null = null
+  for (const r of runs) {
+    if (r[1] < mn) before = r
+    if (r[0] > mn && !after) after = r
+  }
+  if (before && after) {
+    const lo = rightCross(before) as number
+    const hi = leftCross(after) as number
+    return { shape: 'bandstop', peakDb, peakFreq, cutoffs: [lo, hi], center: Math.sqrt(lo * hi), bandwidth: hi - lo }
+  }
+  // Fallback: report the run containing the peak as a band-pass-like feature.
+  const r = runs.find((rr) => pk >= rr[0] && pk <= rr[1]) ?? runs[0]
+  const lo = leftCross(r) ?? freq[0]
+  const hi = rightCross(r) ?? freq[n - 1]
+  return { shape: 'bandpass', peakDb, peakFreq, cutoffs: [lo, hi], center: Math.sqrt(lo * hi), bandwidth: hi - lo }
+}
+
 // ── Node voltage helpers (DMM-1 Voltmeter) ─────────────────────────────────────
 // Read a single node's voltage from a real (.op/.dc) result. Ground / missing → 0.
 export function nodeVoltage(r: SimResult, node: string): number {

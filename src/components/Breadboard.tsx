@@ -119,9 +119,20 @@ export default function Breadboard({ schematic, board, setBoard }: Props) {
             })}
             {board.jumpers.map((j, i) => {
               const a = pos(j.a), b = pos(j.b)
-              return <line key={'j' + i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#9aa0a6" strokeWidth={2.5}
-                style={{ cursor: tool.kind === 'select' ? 'pointer' : 'default' }}
-                onClick={() => { if (tool.kind === 'select') { setBoard((bb) => ({ ...bb, jumpers: bb.jumpers.filter((_, k) => k !== i) })); setCheck(null) } }} />
+              const jnet = nets.get(j.a)
+              const col = (showNets && jnet && activeColor.get(jnet)) || '#c9cdd2'
+              return (
+                <g key={'j' + i} style={{ cursor: tool.kind === 'select' ? 'pointer' : 'default' }}
+                  onClick={() => { if (tool.kind === 'select') { setBoard((bb) => ({ ...bb, jumpers: bb.jumpers.filter((_, k) => k !== i) })); setCheck(null) } }}>
+                  {/* shadow lifts the jumper visually above the board */}
+                  <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#000" strokeOpacity={0.55} strokeWidth={5.5} strokeLinecap="round" />
+                  {/* coloured by its node, so it matches the bus/column it joins */}
+                  <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={col} strokeWidth={3} strokeLinecap="round" />
+                  {/* junction dots = the only points it actually connects */}
+                  <circle cx={a.x} cy={a.y} r={4.6} fill={col} stroke="#000" strokeWidth={1} />
+                  <circle cx={b.x} cy={b.y} r={4.6} fill={col} stroke="#000" strokeWidth={1} />
+                </g>
+              )
             })}
             {board.parts.map((p) => {
               const a = pos(p.aHole), b = pos(p.bHole)

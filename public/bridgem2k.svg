@@ -1,0 +1,48 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="BridgeM2K">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="36%" r="78%">
+      <stop offset="0%" stop-color="#121a22"/>
+      <stop offset="58%" stop-color="#0a0e13"/>
+      <stop offset="100%" stop-color="#05070a"/>
+    </radialGradient>
+    <radialGradient id="haze" cx="50%" cy="44%" r="52%">
+      <stop offset="0%" stop-color="#1fe3ff" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#1fe3ff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="bloom" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="13"/>
+    </filter>
+    <!-- glyph geometry (no stroke colour — set per layer) -->
+    <g id="bm" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M150 132 L150 360"/>
+      <path d="M150 305 a55 55 0 1 1 110 0 a55 55 0 1 1 -110 0"/>
+      <path d="M246 360 L246 202 L311 296 L376 202 L376 360"/>
+    </g>
+    <g id="tk" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M393 343 C393 320 437 320 437 345 C437 366 410 379 393 401 L441 401"/>
+      <path d="M456 316 L456 406"/>
+      <path d="M493 336 L461 369 L495 406"/>
+    </g>
+    <clipPath id="frame"><rect x="6" y="6" width="500" height="500" rx="112"/></clipPath>
+  </defs>
+
+  <rect x="6" y="6" width="500" height="500" rx="112" fill="url(#bg)" stroke="#1b2530" stroke-width="2"/>
+  <rect x="6" y="6" width="500" height="500" rx="112" fill="url(#haze)"/>
+
+  <g clip-path="url(#frame)">
+    <!-- faint glossy floor reflection -->
+    <g opacity="0.10" transform="translate(0,812) scale(1,-1)">
+      <use href="#bm" filter="url(#bloom)" stroke="#2ee6ff" stroke-width="22"/>
+    </g>
+
+    <!-- soft outer glow -->
+    <use href="#bm" filter="url(#bloom)" stroke="#1fd6f5" stroke-width="26"/>
+    <use href="#tk" filter="url(#bloom)" stroke="#1fd6f5" stroke-width="16"/>
+    <!-- coloured tube -->
+    <use href="#bm" stroke="#2ee6ff" stroke-width="22"/>
+    <use href="#tk" stroke="#2ee6ff" stroke-width="13"/>
+    <!-- bright inner core -->
+    <use href="#bm" stroke="#dffbff" stroke-width="7.5"/>
+    <use href="#tk" stroke="#dffbff" stroke-width="4.5"/>
+  </g>
+</svg>

@@ -1,0 +1,47 @@
+<svg viewBox="0 0 824 256" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="BridgeM2K">
+  <defs>
+    <linearGradient id="lpanel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#111821"/>
+      <stop offset="100%" stop-color="#070a0e"/>
+    </linearGradient>
+    <radialGradient id="lhaze" cx="16%" cy="50%" r="40%">
+      <stop offset="0%" stop-color="#1fe3ff" stop-opacity="0.26"/>
+      <stop offset="100%" stop-color="#1fe3ff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="lbloom" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="13"/>
+    </filter>
+    <filter id="ltxt" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+    <g id="lbm" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M150 132 L150 360"/>
+      <path d="M150 305 a55 55 0 1 1 110 0 a55 55 0 1 1 -110 0"/>
+      <path d="M246 360 L246 202 L311 296 L376 202 L376 360"/>
+    </g>
+    <g id="ltk" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M393 343 C393 320 437 320 437 345 C437 366 410 379 393 401 L441 401"/>
+      <path d="M456 316 L456 406"/>
+      <path d="M493 336 L461 369 L495 406"/>
+    </g>
+  </defs>
+
+  <rect x="4" y="4" width="816" height="248" rx="46" fill="url(#lpanel)" stroke="#1b2530" stroke-width="2"/>
+  <rect x="4" y="4" width="816" height="248" rx="46" fill="url(#lhaze)"/>
+
+  <!-- icon (neon only, scaled to ~240) -->
+  <g transform="translate(8,8) scale(0.46875)">
+    <use href="#lbm" filter="url(#lbloom)" stroke="#1fd6f5" stroke-width="26"/>
+    <use href="#ltk" filter="url(#lbloom)" stroke="#1fd6f5" stroke-width="16"/>
+    <use href="#lbm" stroke="#2ee6ff" stroke-width="22"/>
+    <use href="#ltk" stroke="#2ee6ff" stroke-width="13"/>
+    <use href="#lbm" stroke="#dffbff" stroke-width="7.5"/>
+    <use href="#ltk" stroke="#dffbff" stroke-width="4.5"/>
+  </g>
+
+  <!-- wordmark: Bridge crisp white, M2K cyan with glow -->
+  <g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="700" font-size="96" letter-spacing="-1.5">
+    <text x="288" y="162" fill="#2ee6ff" filter="url(#ltxt)" opacity="0.5">BridgeM2K</text>
+    <text x="288" y="162" fill="#ffffff">Bridge<tspan fill="#2ee6ff">M2K</tspan></text>
+  </g>
+</svg>
