@@ -2,13 +2,14 @@
 // it. Place the schematic's R/C/L parts and M2K ports by clicking holes, run jumpers, then Check
 // that the board is electrically the drawn circuit. Practice colours each node live; Bench hides
 // the nodes until Check. See docs/specs/breadboard.md.
-import { useMemo, useState, type Dispatch, type SetStateAction, type CSSProperties } from 'react'
+import { useMemo, useRef, useState, type Dispatch, type SetStateAction, type CSSProperties } from 'react'
 import {
   buildHoles, boardNets, boardWidth, boardHeight, PAD, PITCH, CHANNEL_SLOT,
   schematicExpectation, checkEquivalence, type BoardLayout, type CheckResult,
   dipPinHoles, dipCols, holeKey, DIP_TOP_ROW, DIP_BOT_ROW,
 } from '../core/breadboard'
 import { type Schematic, type SchKind } from '../core/schematic'
+import { type SignalParams } from '../core/signal'
 import './Instrument.css'
 
 type Mode = 'practice' | 'bench'
@@ -23,11 +24,16 @@ const NET_COLORS = ['#f0a030', '#40c0e0', '#44dd88', '#e06fd0', '#d0d040', '#7a8
 
 interface Props {
   schematic: Schematic
+  setSchematic: Dispatch<SetStateAction<Schematic>>
   board: BoardLayout
   setBoard: Dispatch<SetStateAction<BoardLayout>>
+  // Generator settings (W1/W2) travel inside a saved lab so a loaded circuit runs at the right
+  // input level — e.g. a gain-10 amp wants a ~0.3 V input, not the 1 V default that clips.
+  generators?: { w1: SignalParams; w2: SignalParams }
+  onLoadGenerators?: (w1: SignalParams, w2: SignalParams) => void
 }
 
-export default function Breadboard({ schematic, board, setBoard }: Props) {
+export default function Breadboard({ schematic, setSchematic, board, setBoard, generators, onLoadGenerators }: Props) {
   const holes = useMemo(() => buildHoles(), [])
   const holeByKey = useMemo(() => new Map(holes.map((h) => [h.key, h])), [holes])
   const exp = useMemo(() => schematicExpectation(schematic), [schematic])
@@ -98,6 +104,64 @@ export default function Breadboard({ schematic, board, setBoard }: Props) {
 
   function runCheck() { setCheck(checkEquivalence(schematic, board, holes)); if (mode === 'bench') setRevealed(true) }
 
+  // F-3 save/load: a "lab" bundle holds the circuit AND its board layout in one .json, so opening
+  // it restores both and Check works immediately. Mirrors the Schematic editor's Save (SCH-3):
+  // native Save dialog when available, else a download fallback.
+  const fileRef = useRef<HTMLInputElement>(null)
+  async function saveLab() {
+    const json = JSON.stringify({ kind: 'm2k-lab', version: 2, schematic, board, generators }, null, 2)
+    const sfp = (window as unknown as {
+      showSavePicker?: (o: {
+        suggestedName?: string
+        types?: { description?: string; accept: Record<string, string[]> }[]
+      }) => Promise<{ name: string; createWritable: () => Promise<{ write: (d: string) => Promise<void>; close: () => Promise<void> }> }>
+    }).showSavePicker
+    if (typeof sfp === 'function') {
+      try {
+        const handle = await sfp({
+          suggestedName: 'm2k-lab.json',
+          types: [{ description: 'M2K lab (circuit + board)', accept: { 'application/json': ['.json'] } }],
+        })
+        const w = await handle.createWritable(); await w.write(json); await w.close()
+        setCheck({ ok: true, message: 'saved ' + handle.name }); return
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return
+      }
+    }
+    let name = prompt('Save lab as:', 'm2k-lab.json')
+    if (name === null) return
+    name = name.trim() || 'm2k-lab.json'
+    if (!name.toLowerCase().endsWith('.json')) name += '.json'
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
+    const a = document.createElement('a'); a.href = url; a.download = name; a.click()
+    URL.revokeObjectURL(url)
+    setCheck({ ok: true, message: 'saved ' + name })
+  }
+  function openLab(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const d = JSON.parse(String(reader.result))
+        const s = d.schematic, b = d.board
+        const okSchem = s && Array.isArray(s.components) && Array.isArray(s.wires)
+        const okBoard = b && Array.isArray(b.parts) && Array.isArray(b.jumpers) && Array.isArray(b.ports)
+        if (!okSchem || !okBoard) { setCheck({ ok: false, message: 'not a valid lab file (needs a schematic + board)' }); return }
+        setSchematic({ components: s.components, wires: s.wires })
+        setBoard({ parts: b.parts, jumpers: b.jumpers, ports: b.ports, dips: Array.isArray(b.dips) ? b.dips : [] })
+        const g = d.generators
+        if (g && g.w1 && g.w2 && onLoadGenerators) onLoadGenerators(g.w1, g.w2)
+        setTool({ kind: 'select' }); setPending(null)
+        setCheck({ ok: true, message: 'loaded ' + f.name })
+      } catch {
+        setCheck({ ok: false, message: 'could not read lab file' })
+      }
+    }
+    reader.readAsText(f)
+    e.target.value = '' // allow re-loading the same file
+  }
+
   return (
     <div className="instrument-panel">
       <div className="display-area">
@@ -107,6 +171,9 @@ export default function Breadboard({ schematic, board, setBoard }: Props) {
             <button className={`run-btn ${mode === 'practice' ? 'active' : ''}`} onClick={() => { setMode('practice'); setRevealed(false) }}>Practice</button>
             <button className={`run-btn ${mode === 'bench' ? 'active' : ''}`} onClick={() => { setMode('bench'); setRevealed(false); setHoverNet(null) }}>Bench</button>
             <button className="run-btn active" onClick={runCheck}>✓ Check</button>
+            <button className="run-btn" onClick={saveLab}>Save</button>
+            <button className="run-btn" onClick={() => fileRef.current?.click()}>Open</button>
+            <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={openLab} />
           </div>
         </div>
         <div className="plotly-display" style={{ overflow: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 8 }}>

@@ -201,6 +201,20 @@ export default function App() {
 
   const circuitActive = drawnValid && circuitOut !== null
 
+  // Clip detection: warn when the simulated output rides into the supply rails. The op-amp model
+  // clamps to its V+/V- pins, so a too-big input (e.g. 1 V into a gain-10 amp) flat-tops at ±5 V.
+  // Rails come from the circuit's dcrails (the V+/V- parts), falling back to the PSU setting.
+  const outputClipping = useMemo(() => {
+    if (!circuitActive || !circuitOut) return false
+    const rails = drawn.circuit.components.flatMap((c) => (c.kind === 'dcrail' ? [c.volts] : []))
+    const hi = rails.length ? Math.max(...rails) : psu.plus
+    const lo = rails.length ? Math.min(...rails) : psu.minus
+    let mx = -Infinity, mn = Infinity
+    for (const v of circuitOut.x) { if (v > mx) mx = v; if (v < mn) mn = v }
+    const m = 0.02 * Math.max(Math.abs(hi), Math.abs(lo), 1) // within 2% of a rail = clipping
+    return mx >= hi - m || mn <= lo + m
+  }, [circuitActive, circuitOut, drawn, psu])
+
   // SCOPE-CKT-LONG: for long scope timebases (window longer than one generator span), run a
   // separate coarser/longer .tran sized to the scope window so the circuit output fills the
   // screen. Short windows reuse `measured` (the fine 16 ms buffer above); this only fires when
@@ -295,6 +309,7 @@ export default function App() {
             params2={params2}
             running={running}
             circuitActive={circuitActive}
+            outputClipping={outputClipping}
             circuitFs={scopeCircuitFs}
             onWindowSecChange={setScopeWinSec}
             onRunToggle={() => setRunning(r => !r)}
@@ -308,7 +323,9 @@ export default function App() {
               <SchematicEditor schematic={schematic} setSchematic={setSchematic} />
             </div>
             <div className="stacked-pane">
-              <Breadboard schematic={schematic} board={board} setBoard={setBoard} />
+              <Breadboard schematic={schematic} setSchematic={setSchematic} board={board} setBoard={setBoard}
+                generators={{ w1: params, w2: params2 }}
+                onLoadGenerators={(w1, w2) => { setParams({ ...DEFAULT_PARAMS, ...w1 }); setParams2({ ...DEFAULT_PARAMS2, ...w2 }) }} />
             </div>
           </div>
         ) : layout === 'single' && active === 'network' ? (

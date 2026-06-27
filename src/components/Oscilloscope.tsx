@@ -16,6 +16,8 @@ interface Props {
   // True when CH1/CH2 are circuit outputs (fixed-length .tran). When false the scope
   // synthesises its own capture buffer sized to the timebase, so long time/div works.
   circuitActive?: boolean
+  // True when the simulated circuit output is riding the supply rails (clipping) — shows a hint.
+  outputClipping?: boolean
   // Sample rate of the circuit-output buffers (signal/signal2) when circuitActive. App sizes
   // a long .tran to the scope window and resamples at this rate; defaults to params rate.
   circuitFs?: number
@@ -59,7 +61,7 @@ const fmtF = (f: number | null) => (f == null ? '—' : f >= 1000 ? `${(f / 1000
 const fmtT = (s: number | null) => (s == null ? '—' : s < 1e-3 ? `${(s * 1e6).toFixed(1)} µs` : s < 1 ? `${(s * 1e3).toFixed(3)} ms` : `${s.toFixed(4)} s`)
 const fmtD = (d: number | null) => (d == null ? '—' : `${(d * 100).toFixed(1)} %`)
 
-export default function Oscilloscope({ params, signal, signal2, params2, running, circuitActive, circuitFs, onWindowSecChange, compact, onRunToggle, onParams2Change }: Props) {
+export default function Oscilloscope({ params, signal, signal2, params2, running, circuitActive, outputClipping, circuitFs, onWindowSecChange, compact, onRunToggle, onParams2Change }: Props) {
   const plotRef = useRef<HTMLDivElement>(null)
   const initialised = useRef(false)
   const frameRef = useRef(0) // free-running capture-phase counter
@@ -244,6 +246,12 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
             Oscilloscope — <span style={{ color: CH1_COLOR }}>CH1</span>
             {ch2Enabled && <> · <span style={{ color: CH2_COLOR }}>CH2</span></>}
             <span style={{ color: statusColor, marginLeft: 10, fontSize: 11 }}>● {trigStatus}</span>
+            {outputClipping && (
+              <span style={{ color: '#ffaa55', marginLeft: 10, fontSize: 11 }}
+                title="The output is hitting the ±supply rails. Lower the generator amplitude (or the gain) for an undistorted signal.">
+                ⚠ output clipping at the rails
+              </span>
+            )}
           </span>
           <div className="display-controls">
             <button className={`run-btn ${running ? 'active' : ''}`} onClick={onRunToggle}>

@@ -53,6 +53,18 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
   8-pin chip drops across the channel (rejects non-straddling anchors with a hint). Renders the body
   + notch + per-pin net-coloured dots + label; included in Practice colouring, Clear, and delete.
 - `App.tsx`: the schematic→board sync now keeps/drops DIPs by id alongside 2-pin parts.
+- Save/Open on the board: a **"lab" bundle** (`{ kind:'m2k-lab', version:2, schematic, board,
+  generators:{w1,w2} }`) saved to .json (native Save dialog + download fallback, mirroring SCH-3).
+  Open restores the circuit, its board layout, AND the generator settings, so Check works
+  immediately and a worked example / student submission travels as one file that runs at the right
+  input level. `Breadboard` takes `setSchematic` + `generators`/`onLoadGenerators`. v1 files (no
+  generators) still load. Note: the directory chooser is the browser's File System Access API
+  (`showSavePicker`); when a managed browser disables it, it falls back to a download — not an app
+  bug, a browser-policy constraint.
+- Clip warning: App detects when the simulated output rides the supply rails (peak within 2% of a
+  dcrail / PSU rail) and the Oscilloscope shows "⚠ output clipping at the rails". This catches the
+  classic gotcha of feeding 1 V into a gain-10 amp (10 V wanted, ±5 V available). Pairs with the
+  bundled generator settings so a loaded lab is pre-set to a non-clipping input.
 - Each DIP pin lands in its own isolated terminal column (top/bottom banks are split by the
   channel), so the student must jumper from each pin to the rest of the circuit — exactly the bench
   reality.
