@@ -22,6 +22,10 @@ export interface Example {
   // Optional scope mode applied on load: xy:true puts the oscilloscope in XY mode (I-V curves);
   // omitted/false loads in normal time (YT) mode.
   xy?: boolean
+  // Optional scope Volts/div presets so an example frames its curve without manual scaling
+  // (must be one of the scope's steps: 0.05, 0.1, 0.2, 0.5, 1, 2, 5).
+  ch1Vdiv?: number
+  ch2Vdiv?: number
 }
 
 // --- shared amp skeletons (inverting / non-inverting), parameterised by op-amp model ---------
@@ -279,7 +283,7 @@ export const EXAMPLES: Example[] = [
     id: 'diode-iv', name: 'Diode I-V curve (XY)', group: 'Passive',
     blurb: 'Switch the scope to XY mode to see the curve. CH1 (X) = voltage across the diode, CH2 (Y) = current (I·Rsense). W1 is preset to a triangle sweep.',
     w1: { waveType: 'triangle', frequency: 200, amplitude: 2, offset: 0, dutyCycle: 50, samplingRate: 100000, duration: 0.016 },
-    xy: true,
+    xy: true, ch1Vdiv: 0.5, ch2Vdiv: 0.5,
     schematic: {
       components: [
         { id: 'W1', kind: 'awg1', gx: 2, gy: 4 },
@@ -302,7 +306,7 @@ export const EXAMPLES: Example[] = [
     id: 'zener-iv', name: 'Zener I-V curve (XY)', group: 'Passive',
     blurb: 'In XY mode you see the forward knee (~0.7 V) AND the reverse breakdown near −3.3 V. W1 is preset to a ±4 V triangle sweep; if the forward current runs off the top, set CH2 to a coarser Volts/div.',
     w1: { waveType: 'triangle', frequency: 200, amplitude: 4, offset: 0, dutyCycle: 50, samplingRate: 100000, duration: 0.016 },
-    xy: true,
+    xy: true, ch1Vdiv: 2, ch2Vdiv: 1,
     schematic: {
       components: [
         { id: 'W1', kind: 'awg1', gx: 2, gy: 4 },

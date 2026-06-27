@@ -75,8 +75,8 @@ interface EditorProps {
   redo: () => void
   // Apply an example's preset generator (W1) on load (e.g. a triangle sweep for an I-V curve).
   onLoadGenerators?: (w1: import('../core/signal').SignalParams) => void
-  // Request the scope mode an example wants on load (true = XY for I-V curves, false = normal YT).
-  onLoadScope?: (xy: boolean) => void
+  // Request the scope setup an example wants on load (XY mode + optional Volts/div framing).
+  onLoadScope?: (req: { xy: boolean; ch1Vdiv?: number; ch2Vdiv?: number }) => void
 }
 
 export default function SchematicEditor({ schematic, setSchematic, snapshot, undo, redo, onLoadGenerators, onLoadScope }: EditorProps) {
@@ -535,7 +535,7 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
                   setSch(JSON.parse(JSON.stringify(ex.schematic)))
                   setSelected(null); setSelectedWire(null)
                   if (ex.w1) onLoadGenerators?.(ex.w1)
-                  onLoadScope?.(!!ex.xy)
+                  onLoadScope?.({ xy: !!ex.xy, ch1Vdiv: ex.ch1Vdiv, ch2Vdiv: ex.ch2Vdiv })
                   setSimStatus('loaded example: ' + ex.name)
                 }
               }}>

@@ -18,10 +18,10 @@ interface Props {
   circuitActive?: boolean
   // True when the simulated circuit output is riding the supply rails (clipping) — shows a hint.
   outputClipping?: boolean
-  // One-shot request from App (set when an example loads): true → XY mode, false → YT. Consumed
-  // via onXyApplied so it doesn't re-fire and the user can toggle freely afterward.
-  xyRequest?: boolean | null
-  onXyApplied?: () => void
+  // One-shot request from App (set when an example loads): scope mode + Volts/div framing. Consumed
+  // via onScopeApplied so it doesn't re-fire and the user can adjust freely afterward.
+  scopeReq?: { xy: boolean; ch1Vdiv?: number; ch2Vdiv?: number } | null
+  onScopeApplied?: () => void
   // Sample rate of the circuit-output buffers (signal/signal2) when circuitActive. App sizes
   // a long .tran to the scope window and resamples at this rate; defaults to params rate.
   circuitFs?: number
@@ -67,7 +67,7 @@ const fmtF = (f: number | null) => (f == null ? '—' : f >= 1000 ? `${(f / 1000
 const fmtT = (s: number | null) => (s == null ? '—' : s < 1e-3 ? `${(s * 1e6).toFixed(1)} µs` : s < 1 ? `${(s * 1e3).toFixed(3)} ms` : `${s.toFixed(4)} s`)
 const fmtD = (d: number | null) => (d == null ? '—' : `${(d * 100).toFixed(1)} %`)
 
-export default function Oscilloscope({ params, signal, signal2, params2, running, circuitActive, outputClipping, circuitFs, onWindowSecChange, compact, onRunToggle, onParams2Change, xyRequest, onXyApplied }: Props) {
+export default function Oscilloscope({ params, signal, signal2, params2, running, circuitActive, outputClipping, circuitFs, onWindowSecChange, compact, onRunToggle, onParams2Change, scopeReq, onScopeApplied }: Props) {
   const plotRef = useRef<HTMLDivElement>(null)
   const initialised = useRef(false)
   const frameRef = useRef(0) // free-running capture-phase counter
@@ -106,14 +106,17 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
   const [cy2, setCy2] = useState(-1) // voltage cursor 2 (divisions)
   const [xyMode, setXyMode] = useState(false) // plot CH1 (X) vs CH2 (Y) — I-V curves & Lissajous
 
-  // Apply an example's requested scope mode once, then tell App to clear it (so it doesn't re-fire
-  // and the student can still toggle XY/YT by hand afterward). XY needs CH2, so enable it too.
+  // Apply an example's requested scope setup once, then tell App to clear it (so it doesn't re-fire
+  // and the student can still adjust by hand afterward). XY needs CH2, so enable it too; Volts/div
+  // presets frame the curve (e.g. a Zener I-V at 2 V/div on X so its −3.3 V breakdown fits).
   useEffect(() => {
-    if (xyRequest == null) return
-    setXyMode(xyRequest)
-    if (xyRequest) setCh2Enabled(true)
-    onXyApplied?.()
-  }, [xyRequest, onXyApplied])
+    if (!scopeReq) return
+    setXyMode(scopeReq.xy)
+    if (scopeReq.xy) setCh2Enabled(true)
+    if (scopeReq.ch1Vdiv) setCh1VoltsPerDiv(scopeReq.ch1Vdiv)
+    if (scopeReq.ch2Vdiv) setCh2VoltsPerDiv(scopeReq.ch2Vdiv)
+    onScopeApplied?.()
+  }, [scopeReq, onScopeApplied])
 
   // Display-unit handling: short windows read in ms, long ones (≥1 s) in seconds.
   const windowSec = SCOPE_H_DIVS * timePerDiv

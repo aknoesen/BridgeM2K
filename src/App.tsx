@@ -123,9 +123,9 @@ export default function App() {
     histPast.current.push(schematicRef.current)
     setSchematic(histFuture.current.pop()!)
   }
-  // One-shot scope-mode request: an example sets this on load (XY for I-V curves); the Oscilloscope
-  // consumes it and clears it. null = nothing pending.
-  const [scopeXyReq, setScopeXyReq] = useState<boolean | null>(null)
+  // One-shot scope request: an example sets this on load (XY mode + Volts/div framing for I-V
+  // curves); the Oscilloscope consumes it and clears it. null = nothing pending.
+  const [scopeReq, setScopeReq] = useState<{ xy: boolean; ch1Vdiv?: number; ch2Vdiv?: number } | null>(null)
   const [tick, setTick] = useState(0)
   const rafRef = useRef<number | null>(null)
 
@@ -348,20 +348,20 @@ export default function App() {
         return <Oscilloscope params={params} signal={scopeSig1} signal2={scopeSig2} params2={params2}
           running={running} circuitActive={circuitActive} outputClipping={outputClipping}
           circuitFs={scopeCircuitFs} onWindowSecChange={setScopeWinSec} compact={multi}
-          xyRequest={scopeXyReq} onXyApplied={() => setScopeXyReq(null)}
+          scopeReq={scopeReq} onScopeApplied={() => setScopeReq(null)}
           onRunToggle={() => setRunning(r => !r)} onParams2Change={(k, v) => setParams2(prev => ({ ...prev, [k]: v }))} />
       case 'schematic':
         return <SchematicEditor schematic={schematic} setSchematic={setSchematic}
           snapshot={snapshotSchematic} undo={undoSchematic} redo={redoSchematic}
           onLoadGenerators={(w1) => setParams({ ...DEFAULT_PARAMS, ...w1 })}
-          onLoadScope={(xy) => setScopeXyReq(xy)} />
+          onLoadScope={(req) => setScopeReq(req)} />
       case 'breadboard':
         return (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', minHeight: 0 }}>
             <div className="stacked-pane"><SchematicEditor schematic={schematic} setSchematic={setSchematic}
               snapshot={snapshotSchematic} undo={undoSchematic} redo={redoSchematic}
               onLoadGenerators={(w1) => setParams({ ...DEFAULT_PARAMS, ...w1 })}
-          onLoadScope={(xy) => setScopeXyReq(xy)} /></div>
+          onLoadScope={(req) => setScopeReq(req)} /></div>
             <div className="stacked-pane"><Breadboard schematic={schematic} setSchematic={setSchematic} board={board} setBoard={setBoard}
               snapshotSchematic={snapshotSchematic}
               generators={{ w1: params, w2: params2 }}
