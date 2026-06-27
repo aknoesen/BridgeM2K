@@ -36,6 +36,41 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-26 — LMC662: behavioural op-amp model (course part) — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**Why:** the LMC662 is the op-amp the EEC1 course uses; andre supplied the datasheet. Model it
+behaviourally (andre chose GBW + rails) so a drawn circuit shows real bandwidth rolloff + output
+clipping, not just the ideal VCVS.
+
+**What I did:**
+- `core/netlist.ts`: `OpAmp.model` ('ideal' | 'lmc662') + `supplyPos`/`supplyNeg`; `LMC662` constants
+  (Aol 1.995e6 = 126 dB, GBW 1.4 MHz, slew 1.1 V/µs ref). New `opampLines`: ideal → one VCVS (unchanged);
+  lmc662 → single-pole macromodel (E gain → Rp/Cp dominant pole at GBW/Aol ≈ 0.7 Hz) + a **B-source
+  output clip** `V = max(vneg, min(vpos, V(pole)))` to the rails (default ±5 V).
+- Confirmed the WASM engine (ngspice 45.2) supports B-source `max/min` before building on it.
+- `core/spice.test.ts` (+3 engine tests): ×10 non-inverting amp bandwidth ≈140 kHz (GBW/gain) and
+  passband ≈20 dB; ×10 of 2 V clips at +5 V; the ideal op-amp in the same circuit reaches ~20 V.
+- `core/schematic.ts`: `SchComponent.opModel`; `toCircuit` passes `model` to the op-amp.
+- `SchematicEditor.tsx`: a **Model** dropdown (Ideal / LMC662) in the Selected panel when an op-amp is
+  picked, with a one-line note (GBW 1.4 MHz, rail clip ±5 V).
+- `docs/reference/lmc662.md`: datasheet figures + the macromodel mapping + what's not modelled.
+
+**Verification (Definition of Done):**
+- build clean: yes. 12-bit floor: holds (no signal-path change).
+- tests: **67 passed (64 prior + 3 LMC662)**.
+
+**State for the next session:**
+- Place an op-amp, set Model → LMC662: the Network Analyzer shows the closed-loop bandwidth rolloff and
+  the scope shows the output clipping at the rails. Ideal stays the default.
+- **Not yet:** slew rate (1.1 V/µs, needs a nonlinear limiter), input offset/bias, and rails tracking the
+  PSU (clip rails are the component's supplyPos/Neg, default ±5 V; no per-op-amp supply field in the
+  editor yet — edit defaults in code or extend the inspector). See `docs/reference/lmc662.md`.
+
+---
+
 ### 2026-06-26 — OSC-4: holdoff + pulse/width trigger + single-shot polish — DONE
 
 **By:** Claude Code session (in Cowork)

@@ -250,6 +250,53 @@ describe('findCutoffHz (LOOP-2 -3 dB cursor)', () => {
   })
 })
 
+describe('LMC662 behavioural op-amp', () => {
+  // Non-inverting ×10 amp: gain = 1 + Rf/Rg = 1 + 9k/1k = 10.
+  function noninv(model: 'ideal' | 'lmc662', drive: Ckt['components'][number]): Ckt {
+    return {
+      title: `noninv ${model}`,
+      components: [
+        drive,
+        { kind: 'opamp', id: '1', model, nodes: { inP: 'in', inN: 'fb', out: 'out' } },
+        { kind: 'resistor', id: 'f', nodes: ['out', 'fb'], ohms: 9000 },
+        { kind: 'resistor', id: 'g', nodes: ['fb', '0'], ohms: 1000 },
+        { kind: 'ground', id: '0', node: '0' },
+      ],
+    }
+  }
+
+  it('closed-loop bandwidth ≈ GBW/gain (140 kHz for ×10)', async () => {
+    const ckt = noninv('lmc662', { kind: 'vsource', id: '1', nodes: ['in', '0'], dc: 0, acMag: 1 })
+    const sim = new Simulation()
+    await sim.start()
+    sim.setNetList(buildNetlist(ckt, { kind: 'ac', sweep: 'dec', points: 50, fStart: 100, fStop: 1e7 }))
+    const tf = transferFunction(normalizeResult(await sim.runSim()), 'out', 'in')
+    expect(tf.magDb[0]).toBeCloseTo(20, 0) // ×10 passband ≈ 20 dB
+    const feat = analyzeBode(tf.freq, tf.magDb)
+    expect(feat.shape).toBe('lowpass')
+    expect(Math.abs(feat.cutoffs[0] - 140000) / 140000).toBeLessThan(0.15)
+  }, 30000)
+
+  it('output clips at the supply rail (×10 of 2 V wants 20 V → clamps to +5 V)', async () => {
+    const ckt = noninv('lmc662', { kind: 'vsource', id: '1', nodes: ['in', '0'], dc: 2 })
+    const sim = new Simulation()
+    await sim.start()
+    sim.setNetList(buildNetlist(ckt, { kind: 'op' }))
+    const v = nodeVoltage(normalizeResult(await sim.runSim()), 'out')
+    expect(v).toBeGreaterThan(4.8)
+    expect(v).toBeLessThan(5.2) // clamped near +5 V, not 20 V
+  }, 30000)
+
+  it('ideal op-amp does not clip (same circuit reaches ~20 V)', async () => {
+    const ckt = noninv('ideal', { kind: 'vsource', id: '1', nodes: ['in', '0'], dc: 2 })
+    const sim = new Simulation()
+    await sim.start()
+    sim.setNetList(buildNetlist(ckt, { kind: 'op' }))
+    const v = nodeVoltage(normalizeResult(await sim.runSim()), 'out')
+    expect(v).toBeCloseTo(20, 0)
+  }, 30000)
+})
+
 describe('analyzeBode (general -3 dB feature)', () => {
   // log-spaced magnitude sampler
   function sample(fn: (f: number) => number, fStart = 10, fStop = 1e6, ptsPerDec = 100) {

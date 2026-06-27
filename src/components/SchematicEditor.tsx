@@ -285,6 +285,12 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
     setSch((s) => ({ ...s, components: s.components.map((c) => c.id === sel.id ? { ...c, value: v } : c) }))
   }
 
+  // Op-amp model selector (ideal VCVS vs the LMC662 behavioural model).
+  function setSelModel(m: 'ideal' | 'lmc662') {
+    if (!sel) return
+    setSch((s) => ({ ...s, components: s.components.map((c) => c.id === sel.id ? { ...c, opModel: m } : c) }))
+  }
+
   const px = (g: number) => g * GRID + PAD
 
   return (
@@ -410,6 +416,22 @@ export default function SchematicEditor({ schematic, setSchematic }: EditorProps
                 </div>
               )
             })()}
+            {sel.kind === 'opamp' && (
+              <>
+                <div className="control-row-inline">
+                  <label>Model</label>
+                  <select value={sel.opModel ?? 'ideal'} onChange={(e) => setSelModel(e.target.value as 'ideal' | 'lmc662')} style={{ width: 110 }}>
+                    <option value="ideal">Ideal</option>
+                    <option value="lmc662">LMC662</option>
+                  </select>
+                </div>
+                {sel.opModel === 'lmc662' && (
+                  <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 2, lineHeight: 1.4 }}>
+                    GBW 1.4 MHz, rail-to-rail out clipped at ±5 V. Bode shows the rolloff; scope shows clipping.
+                  </div>
+                )}
+              </>
+            )}
           </div>
         ) : selectedWire !== null ? (
           <div style={{ fontSize: 11, color: 'var(--accent-blue)' }}>Wire selected — press Delete to remove</div>

@@ -32,6 +32,7 @@ export interface SchComponent {
   gy: number
   rotation?: number // 0..3 → 0/90/180/270 degrees clockwise (default 0)
   value?: number // ohms / farads / henries (vsource uses AC 1)
+  opModel?: 'ideal' | 'lmc662' // for kind 'opamp': ideal VCVS or the LMC662 behavioural model
 }
 
 export interface Wire {
@@ -292,6 +293,7 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
       comps.push({
         kind: 'opamp',
         id: String(ec++),
+        model: c.opModel ?? 'ideal',
         nodes: {
           inP: rename(netOf(ts[0].gx, ts[0].gy)),
           inN: rename(netOf(ts[1].gx, ts[1].gy)),

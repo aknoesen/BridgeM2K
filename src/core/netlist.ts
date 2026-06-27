@@ -62,13 +62,29 @@ export interface DCRail {
   volts: number
 }
 
-// Ideal op-amp, emitted as a high-gain VCVS (E device). `vpos`/`vneg` rail nets are carried
-// for future powered/clipping models; the ideal VCVS ignores them for now.
+// Op-amp.
+//  - 'ideal' (default): a single high-gain VCVS (E device) — infinite bandwidth, no clipping.
+//  - 'lmc662': behavioural model of the TI LMC662 dual CMOS op-amp used in the EEC1 course
+//    (datasheet: open-loop gain 126 dB, GBW 1.4 MHz, rail-to-rail output, slew 1.1 V/µs).
+//    Implemented as a single-pole macromodel (dominant pole at GBW/Aol ≈ 0.7 Hz so the
+//    gain·bandwidth product is 1.4 MHz) plus a B-source that clips the output to the supply
+//    rails. AC sees the bandwidth rolloff; transient sees the rail clipping. Slew rate is not
+//    modelled yet. `supplyPos`/`supplyNeg` set the clip rails (default ±5 V, the M2K supplies).
 export interface OpAmp {
   kind: 'opamp'
   id: string // e.g. '1' -> E1
+  model?: 'ideal' | 'lmc662'
   nodes: { inP: Net; inN: Net; out: Net; vpos?: Net; vneg?: Net }
-  gain?: number // open-loop gain (default 1e6)
+  gain?: number // open-loop gain (default 1e6 for ideal; the LMC662 uses its datasheet 126 dB)
+  supplyPos?: number // LMC662 positive rail for output clipping (default +5 V)
+  supplyNeg?: number // LMC662 negative rail for output clipping (default −5 V)
+}
+
+// LMC662 datasheet constants (TI LMC662, behavioural model).
+export const LMC662 = {
+  aol: 1.995e6,   // 126 dB open-loop voltage gain
+  gbw: 1.4e6,     // gain·bandwidth product, Hz
+  slewVPerUs: 1.1, // not yet modelled; kept for reference
 }
 
 // Instrumentation amplifier. Two models, same 4 pins (inP, inN, out, ref):
@@ -193,6 +209,28 @@ function inampLines(c: InAmp, n: (net: Net) => string): string[] {
   return L
 }
 
+// Op-amp emission. Ideal → one VCVS. LMC662 → single-pole macromodel + rail clip (see OpAmp).
+function opampLines(c: OpAmp, n: (net: Net) => string): string[] {
+  const inP = n(c.nodes.inP), inN = n(c.nodes.inN), out = n(c.nodes.out)
+  if ((c.model ?? 'ideal') === 'ideal') {
+    return [`E${c.id} ${out} 0 ${inP} ${inN} ${fmt(c.gain ?? 1e6)}`]
+  }
+  // LMC662: dominant pole fp = GBW/Aol gives the 1.4 MHz gain·bandwidth product.
+  const aol = LMC662.aol
+  const fp = LMC662.gbw / aol
+  const rp = 1000
+  const cp = 1 / (2 * Math.PI * fp * rp)
+  const vp = c.supplyPos ?? 5
+  const vn = c.supplyNeg ?? -5
+  const g = `xop${c.id}_g`, o = `xop${c.id}_o`
+  return [
+    `E${c.id} ${g} 0 ${inP} ${inN} ${fmt(aol)}`,        // open-loop gain
+    `Rp${c.id} ${g} ${o} ${fmt(rp)}`,                    // dominant-pole R…
+    `Cp${c.id} ${o} 0 ${fmt(cp)}`,                       // …and C → -20 dB/decade above fp
+    `B${c.id} ${out} 0 V = max(${fmt(vn)}, min(${fmt(vp)}, V(${o})))`, // rail-to-rail output clip
+  ]
+}
+
 function analysisDirective(a: Analysis): string {
   switch (a.kind) {
     case 'tran':
@@ -231,9 +269,7 @@ export function buildNetlist(circuit: Circuit, analysis: Analysis): string {
         lines.push(`V${c.id} ${n(c.node)} 0 DC ${fmt(c.volts)}`)
         break
       case 'opamp':
-        lines.push(
-          `E${c.id} ${n(c.nodes.out)} 0 ${n(c.nodes.inP)} ${n(c.nodes.inN)} ${fmt(c.gain ?? 1e6)}`,
-        )
+        lines.push(...opampLines(c, n))
         break
       case 'inamp':
         lines.push(...inampLines(c, n))
