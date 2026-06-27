@@ -36,6 +36,73 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-26 — OSC-4: holdoff + pulse/width trigger + single-shot polish — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**What I did:**
+- `core/trigger.ts`: `findEdgeTriggers` (all crossings), `applyHoldoff(triggers, holdoffSamples)`
+  (keeps the first, drops any inside the holdoff window), and `findPulseTrigger(v, level, polarity,
+  widthMode, widthSamples, startIndex)` — finds the first pulse (run above/below level) whose width
+  meets `<`/`>` the threshold, interpolated. Pure, no React.
+- `core/trigger.test.ts` (+7 tests): crossing list; holdoff suppression ([10,14,40,44] @20 → [10,40]);
+  first-trigger-always-kept; pulse less-than finds the narrow pulse, greater-than the wide one,
+  negative polarity, and null when nothing qualifies.
+- `Oscilloscope.tsx`: trigger **Type** selector (Edge / Pulse). Edge mode adds a **Holdoff (ms)** control
+  plus a live "edges in buffer: N → M after holdoff" readout (makes the suppression visible/teachable).
+  Pulse mode adds **polarity / width-is (< or >) / width (ms)** and triggers only on a qualifying pulse.
+  Single-shot polish: the re-arm button now shows "Armed — waiting…" vs "Re-arm".
+
+**Verification (Definition of Done):**
+- build clean: yes. 12-bit floor: holds (no signal-path change).
+- tests: **64 passed (57 prior + 7 trigger)**.
+
+**State for the next session:**
+- Trigger system now at Scopy parity: edge + pulse/width, holdoff, auto/normal/single. Track A
+  (Oscilloscope) is complete — OSC-1..5 all DONE.
+- Holdoff in this single-buffer-per-frame twin is realised honestly: it filters the trigger list and
+  the count readout shows the suppression; on a burst/narrow-duty wave it re-aligns to the first kept
+  edge. It is a no-op on a plain wave whose period exceeds the holdoff (correct, matches real scopes).
+
+---
+
+### 2026-06-26 — SCOPE-CKT-LONG: long timebase through a drawn circuit — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**Why:** SCOPE-LONG fixed long time/div for the direct-generator path only. Through a drawn circuit the
+scope still used the App's fine 16 ms `.tran` buffer, so long windows on a circuit-routed channel showed
+only a sliver. This closes that gap.
+
+**What I did:**
+- `Oscilloscope.tsx`: two new props — `circuitFs` (sample rate of the circuit buffers) and
+  `onWindowSecChange` (the scope reports its window length each time it changes). The circuit-path branch
+  of the capture memo now uses `circuitFs` for `srcFs`.
+- `App.tsx`: a **second, scope-specific** transient effect. When a circuit is active and the scope window
+  exceeds one generator span, it runs a separate coarser/longer `.tran` (settle a few periods, then cover
+  window×2.2), resampled at a rate capped to ≤200k samples, and feeds it to the scope as `scopeSig1/2`
+  with `scopeCircuitFs`. Short windows still reuse the existing fine `measured` buffer — the long sim only
+  fires when needed. The original `circuitOut` effect (Spectrum Analyzer's fine 16 ms buffer) is unchanged,
+  so the FFT path and its fidelity are untouched.
+
+**Verification (Definition of Done):**
+- build clean: yes. 12-bit floor: holds (the spectrum's circuit buffer + the no-circuit canary path are
+  unchanged; the long sim is a separate buffer that only feeds the scope).
+- tests: **57 passed** (component/App-level change; no new core math). Behaviour reasoned: e.g. a 1 Hz sine
+  through an RC at 200 ms/div now runs a ~2 s `.tran` and the scope shows the filtered output across the
+  full window; at 1 ms/div nothing changes (reuses the 16 ms buffer).
+
+**State for the next session:**
+- Long time/div now works for both the direct generator and a drawn circuit. Two transient effects exist
+  by design: a fine short one (spectrum + short scope) and a coarse long one (scope only, on demand).
+- Cost note: very long window × high drive frequency forces many `.tran` points; the step is capped at
+  window×2.2/200k, so high-frequency detail coarsens on very long windows (the pedagogically sensible
+  tradeoff — long timebase is for low-frequency viewing).
+
+---
+
 ### 2026-06-26 — SCOPE-LONG: long timebase + synthesized capture buffer — DONE
 
 **By:** Claude Code session (in Cowork)

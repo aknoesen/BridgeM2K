@@ -20,7 +20,7 @@ Spec: `docs/specs/oscilloscope.md`
 | OSC-1 | Oscilloscope panel scaffold + timebase + CH1 trace | ARCH-1 | DONE |
 | OSC-2 | Second channel (CH2) + per-channel vertical controls | OSC-1 | DONE |
 | OSC-3 | Edge trigger engine (source/level/slope, auto/normal/single) | OSC-2 | DONE |
-| OSC-4 | Holdoff + pulse/width trigger + single-shot capture (parity) | OSC-3 | TODO |
+| OSC-4 | Holdoff + pulse/width trigger + single-shot capture (parity) | OSC-3 | DONE |
 | OSC-5 | Measurements panel + cursors (Vpp, Vrms, freq, period, duty) | OSC-3 | DONE |
 
 ## Track B — Schematic editor + NGSpice WASM (the circuit loop)

@@ -24,6 +24,67 @@ export function findEdgeTrigger(
   return null
 }
 
+// All sub-sample rising/falling crossings at/after `startIndex` (OSC-4 — used for the
+// holdoff demo and the trigger count). Same interpolation as findEdgeTrigger.
+export function findEdgeTriggers(
+  v: ArrayLike<number>, level: number, slope: Slope, startIndex = 0,
+): number[] {
+  const out: number[] = []
+  const start = Math.max(1, Math.floor(startIndex))
+  for (let i = start; i < v.length; i++) {
+    const a = v[i - 1], b = v[i]
+    const cross = slope === 'rising' ? (a < level && b >= level) : (a > level && b <= level)
+    if (cross) out.push((i - 1) + (b !== a ? (level - a) / (b - a) : 0))
+  }
+  return out
+}
+
+// Holdoff: after a trigger, ignore further triggers for `holdoffSamples`. Returns the accepted
+// subset of `triggers` (assumed ascending) — the first, then any that are ≥ holdoff after the
+// last accepted one. This is the machine-checkable form of "holdoff suppresses extra triggers".
+export function applyHoldoff(triggers: number[], holdoffSamples: number): number[] {
+  const out: number[] = []
+  let last = -Infinity
+  for (const t of triggers) {
+    if (t - last >= holdoffSamples) { out.push(t); last = t }
+  }
+  return out
+}
+
+export type PulsePolarity = 'pos' | 'neg'
+export type WidthMode = 'lessThan' | 'greaterThan'
+
+// Pulse/width trigger (OSC-4). A pulse is a run above `level` (positive polarity) or below it
+// (negative). Returns the sub-sample start index of the first pulse whose width (in samples)
+// satisfies the comparison against `widthSamples`, or null. Pulses not closed within the buffer
+// are ignored. The returned index is the level crossing that begins the qualifying pulse.
+export function findPulseTrigger(
+  v: ArrayLike<number>, level: number, polarity: PulsePolarity,
+  widthMode: WidthMode, widthSamples: number, startIndex = 0,
+): number | null {
+  const n = v.length
+  const inside = (x: number) => (polarity === 'pos' ? x >= level : x <= level)
+  let i = Math.max(1, Math.floor(startIndex))
+  while (i < n) {
+    if (inside(v[i]) && !inside(v[i - 1])) {
+      const sf = v[i] !== v[i - 1] ? (level - v[i - 1]) / (v[i] - v[i - 1]) : 0
+      const startX = (i - 1) + sf
+      let j = i + 1
+      while (j < n && inside(v[j])) j++
+      if (j >= n) return null // pulse runs off the end of the buffer
+      const ef = v[j] !== v[j - 1] ? (level - v[j - 1]) / (v[j] - v[j - 1]) : 0
+      const endX = (j - 1) + ef
+      const width = endX - startX
+      const ok = widthMode === 'lessThan' ? width < widthSamples : width > widthSamples
+      if (ok) return startX
+      i = j + 1
+    } else {
+      i++
+    }
+  }
+  return null
+}
+
 // Mode state machine. `armed` matters only for single-shot (waiting to capture one frame).
 export interface TriggerState { armed: boolean }
 export type TriggerShow = 'triggered' | 'free' | 'hold'

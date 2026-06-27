@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Plotly from 'plotly.js-dist-min'
 import { SignalParams, generateSignal } from '../core/signal'
 import { captureWindow, measureTrace, SCOPE_H_DIVS, SCOPE_V_DIVS, type ScopeMeasurements } from '../core/scope'
-import { findEdgeTrigger, nextTriggerState, type Slope, type TriggerMode } from '../core/trigger'
+import { findEdgeTrigger, findEdgeTriggers, applyHoldoff, findPulseTrigger, nextTriggerState, type Slope, type TriggerMode, type PulsePolarity, type WidthMode } from '../core/trigger'
 import './Instrument.css'
 
 interface Samples { t: Float64Array; x: Float64Array }
@@ -16,6 +16,11 @@ interface Props {
   // True when CH1/CH2 are circuit outputs (fixed-length .tran). When false the scope
   // synthesises its own capture buffer sized to the timebase, so long time/div works.
   circuitActive?: boolean
+  // Sample rate of the circuit-output buffers (signal/signal2) when circuitActive. App sizes
+  // a long .tran to the scope window and resamples at this rate; defaults to params rate.
+  circuitFs?: number
+  // The scope reports its window length (s) so App can size the circuit .tran to cover it.
+  onWindowSecChange?: (sec: number) => void
   compact?: boolean
   onRunToggle: () => void
   onParams2Change: <K extends keyof SignalParams>(key: K, value: SignalParams[K]) => void
@@ -54,7 +59,7 @@ const fmtF = (f: number | null) => (f == null ? '—' : f >= 1000 ? `${(f / 1000
 const fmtT = (s: number | null) => (s == null ? '—' : s < 1e-3 ? `${(s * 1e6).toFixed(1)} µs` : s < 1 ? `${(s * 1e3).toFixed(3)} ms` : `${s.toFixed(4)} s`)
 const fmtD = (d: number | null) => (d == null ? '—' : `${(d * 100).toFixed(1)} %`)
 
-export default function Oscilloscope({ params, signal, signal2, params2, running, circuitActive, compact, onRunToggle, onParams2Change }: Props) {
+export default function Oscilloscope({ params, signal, signal2, params2, running, circuitActive, circuitFs, onWindowSecChange, compact, onRunToggle, onParams2Change }: Props) {
   const plotRef = useRef<HTMLDivElement>(null)
   const initialised = useRef(false)
   const frameRef = useRef(0) // free-running capture-phase counter
@@ -73,6 +78,14 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
   const [trigMode, setTrigMode] = useState<TriggerMode>('auto')
   const [singleArmed, setSingleArmed] = useState(true)
   const [trigStatus, setTrigStatus] = useState('Auto')
+
+  // OSC-4: trigger type, pulse/width, holdoff
+  const [trigType, setTrigType] = useState<'edge' | 'pulse'>('edge')
+  const [pulsePolarity, setPulsePolarity] = useState<PulsePolarity>('pos')
+  const [pulseWidthMode, setPulseWidthMode] = useState<WidthMode>('lessThan')
+  const [pulseWidthMs, setPulseWidthMs] = useState(0.5)
+  const [holdoffMs, setHoldoffMs] = useState(0)
+  const [trigCounts, setTrigCounts] = useState<{ total: number; kept: number } | null>(null)
 
   // Measurements + cursors (OSC-5)
   const [showMeas, setShowMeas] = useState(true)
@@ -101,14 +114,17 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
   const memoSig = circuitActive ? signal : null
   const memoSig2 = circuitActive ? signal2 : null
   const { ch1src, ch2src, srcFs } = useMemo(() => {
-    if (circuitActive) return { ch1src: signal, ch2src: signal2, srcFs: params.samplingRate }
+    if (circuitActive) return { ch1src: signal, ch2src: signal2, srcFs: circuitFs ?? params.samplingRate }
     const capSec = windowSec * 2.2
     const fs = Math.min(params.samplingRate, Math.max(2000, Math.floor(200000 / capSec)))
     const a = generateSignal({ ...params, samplingRate: fs, duration: capSec })
     const b = ch2Enabled ? generateSignal({ ...params2, samplingRate: fs, duration: capSec }) : null
     return { ch1src: a, ch2src: b, srcFs: fs }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [circuitActive, memoSig, memoSig2, params, params2, ch2Enabled, windowSec])
+  }, [circuitActive, circuitFs, memoSig, memoSig2, params, params2, ch2Enabled, windowSec])
+
+  // Report the window length so App can size a circuit .tran to cover long timebases.
+  useEffect(() => { onWindowSecChange?.(windowSec) }, [windowSec, onWindowSecChange])
 
   useEffect(() => {
     if (!plotRef.current) return
@@ -127,7 +143,22 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
 
     // ── Trigger ────────────────────────────────────────────────────────────────
     const src = trigSource === 'ch2' ? ch2src : ch1src
-    const trigIdx = src ? findEdgeTrigger(src.x, trigLevel, trigSlope, halfWinSamples) : null
+    let trigIdx: number | null = null
+    if (src) {
+      if (trigType === 'pulse') {
+        trigIdx = findPulseTrigger(src.x, trigLevel, pulsePolarity, pulseWidthMode, (pulseWidthMs / 1000) * Fs, halfWinSamples)
+        setTrigCounts(null)
+      } else if (holdoffMs > 0) {
+        // Holdoff demo: list every edge, suppress those inside the holdoff window, align to the first kept.
+        const all = findEdgeTriggers(src.x, trigLevel, trigSlope, 0)
+        const kept = applyHoldoff(all, (holdoffMs / 1000) * Fs)
+        setTrigCounts({ total: all.length, kept: kept.length })
+        trigIdx = kept.find((t) => t >= halfWinSamples) ?? (kept.length ? kept[0] : null)
+      } else {
+        trigIdx = findEdgeTrigger(src.x, trigLevel, trigSlope, halfWinSamples)
+        setTrigCounts(null)
+      }
+    }
     const decision = nextTriggerState({ armed: singleArmed }, trigIdx !== null, trigMode)
     if (decision.state.armed !== singleArmed) setSingleArmed(decision.state.armed)
     setTrigStatus(decision.status)
@@ -200,6 +231,7 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ch1src, ch2src, srcFs, ch2Enabled, timePerDiv, ch1VoltsPerDiv, ch1Offset, ch2VoltsPerDiv, ch2Offset,
       trigSource, trigLevel, trigSlope, trigMode, singleArmed, running,
+      trigType, pulsePolarity, pulseWidthMode, pulseWidthMs, holdoffMs,
       showCursors, cx1, cx2, cy1, cy2, tScale, tUnit, windowDisp, windowSec])
 
   const statusColor = trigStatus.startsWith('Trig') ? TRIG_COLOR : trigStatus === 'Auto' ? '#88dd88' : 'var(--text-secondary)'
@@ -267,6 +299,13 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
 
         <div className="section-title" style={{ color: TRIG_COLOR }}>Trigger</div>
         <div className="control-row-inline">
+          <label>Type</label>
+          <select value={trigType} onChange={(e) => setTrigType(e.target.value as 'edge' | 'pulse')} style={{ width: 90 }}>
+            <option value="edge">Edge</option>
+            <option value="pulse">Pulse / width</option>
+          </select>
+        </div>
+        <div className="control-row-inline">
           <label>Source</label>
           <select value={trigSource} onChange={(e) => setTrigSource(e.target.value as 'ch1' | 'ch2')} style={{ width: 90 }}>
             <option value="ch1">CH1</option>
@@ -281,22 +320,60 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
             <option value="single">Single</option>
           </select>
         </div>
-        <div className="control-row-inline">
-          <label>Slope</label>
-          <select value={trigSlope} onChange={(e) => setTrigSlope(e.target.value as Slope)} style={{ width: 90 }}>
-            <option value="rising">Rising ↑</option>
-            <option value="falling">Falling ↓</option>
-          </select>
-        </div>
+        {trigType === 'edge' ? (
+          <>
+            <div className="control-row-inline">
+              <label>Slope</label>
+              <select value={trigSlope} onChange={(e) => setTrigSlope(e.target.value as Slope)} style={{ width: 90 }}>
+                <option value="rising">Rising ↑</option>
+                <option value="falling">Falling ↓</option>
+              </select>
+            </div>
+            <div className="control-row-inline">
+              <label>Holdoff (ms)</label>
+              <input type="number" min={0} step={0.1} value={holdoffMs} onChange={(e) => setHoldoffMs(Math.max(0, Number(e.target.value)))} style={{ width: 80 }} />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="control-row-inline">
+              <label>Polarity</label>
+              <select value={pulsePolarity} onChange={(e) => setPulsePolarity(e.target.value as PulsePolarity)} style={{ width: 90 }}>
+                <option value="pos">Positive ⊓</option>
+                <option value="neg">Negative ⊔</option>
+              </select>
+            </div>
+            <div className="control-row-inline">
+              <label>Width is</label>
+              <select value={pulseWidthMode} onChange={(e) => setPulseWidthMode(e.target.value as WidthMode)} style={{ width: 90 }}>
+                <option value="lessThan">&lt; than</option>
+                <option value="greaterThan">&gt; than</option>
+              </select>
+            </div>
+            <div className="control-row-inline">
+              <label>Width (ms)</label>
+              <input type="number" min={0} step={0.05} value={pulseWidthMs} onChange={(e) => setPulseWidthMs(Math.max(0, Number(e.target.value)))} style={{ width: 80 }} />
+            </div>
+          </>
+        )}
         <div className="control-row-inline">
           <label>Level (V)</label>
           <input type="number" step={0.1} value={trigLevel} onChange={(e) => setTrigLevel(Number(e.target.value))} style={{ width: 80 }} />
         </div>
         {trigMode === 'single' && (
-          <button className="run-btn" style={{ marginTop: 6 }} onClick={() => setSingleArmed(true)}>Re-arm</button>
+          <button className="run-btn" style={{ marginTop: 6 }} onClick={() => setSingleArmed(true)}>
+            {singleArmed ? 'Armed — waiting…' : 'Re-arm'}
+          </button>
+        )}
+        {trigType === 'edge' && holdoffMs > 0 && trigCounts && (
+          <div style={{ fontSize: 10, color: TRIG_COLOR, marginTop: 4 }}>
+            edges in buffer: {trigCounts.total} → {trigCounts.kept} after holdoff
+          </div>
         )}
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.5 }}>
-          Auto free-runs (scrolls) without a trigger; Normal holds; Single captures one frame then stops.
+          {trigType === 'pulse'
+            ? 'Fires only on a pulse whose width meets the condition — useful for glitch / runt capture.'
+            : 'Auto free-runs (scrolls) without a trigger; Normal holds; Single captures one frame then stops.'}
         </div>
 
         <div className="section-title">Measure</div>

@@ -184,6 +184,53 @@ export default function App() {
   const measured = drawnValid && circuitOut ? circuitOut : signal
   const measured2 = drawnValid && circuitOut2 ? circuitOut2 : signal2
 
+  const circuitActive = drawnValid && circuitOut !== null
+
+  // SCOPE-CKT-LONG: for long scope timebases (window longer than one generator span), run a
+  // separate coarser/longer .tran sized to the scope window so the circuit output fills the
+  // screen. Short windows reuse `measured` (the fine 16 ms buffer above); this only fires when
+  // the scope asks for more than that buffer can cover.
+  const [scopeWinSec, setScopeWinSec] = useState(0.01)
+  const [scopeOut1, setScopeOut1] = useState<Samples | null>(null)
+  const [scopeOut2, setScopeOut2] = useState<Samples | null>(null)
+  const [scopeFs, setScopeFs] = useState(params.samplingRate)
+
+  useEffect(() => {
+    if (!circuitActive) { setScopeOut1(null); setScopeOut2(null); return }
+    const genSpan = generateSignal(params).t.length / params.samplingRate
+    if (scopeWinSec <= genSpan) { setScopeOut1(null); setScopeOut2(null); return }
+    let cancelled = false
+    const handle = setTimeout(async () => {
+      try {
+        const capSec = scopeWinSec * 2.2
+        const fs = Math.min(params.samplingRate, Math.max(2000, Math.floor(200000 / capSec)))
+        const settle = Math.max(genSpan, 3 / params.frequency) // let startup transients decay
+        const stop = settle + capSec
+        const step = Math.max(capSec / 200000, 1 / (params.frequency * 40)) // resolve the drive, cap points
+        const ckt = applyGeneratorParams(drawn.circuit, params, params2)
+        const res = await spiceRef.current!.run(buildNetlist(ckt, { kind: 'tran', step, stop }))
+        if (cancelled) return
+        const Nn = Math.round(capSec * fs)
+        const tGrid = new Float64Array(Nn)
+        const sampGrid = new Float64Array(Nn)
+        for (let k = 0; k < Nn; k++) { tGrid[k] = k / fs; sampGrid[k] = settle + k / fs }
+        const x1 = sampleNodeTransient(res, drawn.probes.ch1 ?? 'out', sampGrid)
+        setScopeOut1(x1 ? { t: tGrid, x: x1 } : null)
+        const x2 = drawn.probes.ch2 ? sampleNodeTransient(res, drawn.probes.ch2, sampGrid) : null
+        setScopeOut2(x2 ? { t: tGrid, x: x2 } : null)
+        setScopeFs(fs)
+      } catch {
+        if (!cancelled) { setScopeOut1(null); setScopeOut2(null) }
+      }
+    }, 250)
+    return () => { cancelled = true; clearTimeout(handle) }
+  }, [circuitActive, drawn, params, params2, scopeWinSec])
+
+  // What the scope shows: the long circuit buffer when present, else the standard `measured`.
+  const scopeSig1 = circuitActive ? (scopeOut1 ?? measured) : measured
+  const scopeSig2 = circuitActive ? (scopeOut2 ?? measured2) : measured2
+  const scopeCircuitFs = scopeOut1 ? scopeFs : params.samplingRate
+
   function updateParam<K extends keyof SignalParams>(key: K, value: SignalParams[K]) {
     setParams(prev => ({ ...prev, [key]: value }))
   }
@@ -228,11 +275,13 @@ export default function App() {
         {layout === 'single' && active === 'scope' ? (
           <Oscilloscope
             params={params}
-            signal={measured}
-            signal2={measured2}
+            signal={scopeSig1}
+            signal2={scopeSig2}
             params2={params2}
             running={running}
-            circuitActive={drawnValid && circuitOut !== null}
+            circuitActive={circuitActive}
+            circuitFs={scopeCircuitFs}
+            onWindowSecChange={setScopeWinSec}
             onRunToggle={() => setRunning(r => !r)}
             onParams2Change={(k, v) => setParams2(prev => ({ ...prev, [k]: v }))}
           />
