@@ -16,9 +16,11 @@ export interface Example {
   group: 'Passive' | 'Amplifiers'
   blurb: string
   schematic: Schematic
-  // Optional generator (W1) preset applied on load — e.g. an I-V curve needs a triangle SWEEP, not
-  // the default square. Omit to leave the generator as the student has it.
+  // Optional generator presets applied on load — e.g. an I-V curve needs a triangle SWEEP, not the
+  // default square; the summing amp needs both W1 and W2. Loading any example with a w1 resets the
+  // generators (W2 back to default unless w2 is given) so there is no carryover from a prior example.
   w1?: SignalParams
+  w2?: SignalParams
   // Optional scope mode applied on load: xy:true puts the oscilloscope in XY mode (I-V curves);
   // omitted/false loads in normal time (YT) mode.
   xy?: boolean
@@ -27,6 +29,10 @@ export interface Example {
   ch1Vdiv?: number
   ch2Vdiv?: number
 }
+
+// A clean sine generator preset (most examples just want a steady tone to frame on the scope).
+const sine = (frequency: number, amplitude = 1): SignalParams =>
+  ({ waveType: 'sine', frequency, amplitude, offset: 0, dutyCycle: 50, samplingRate: 100000, duration: 0.016 })
 
 // --- shared amp skeletons (inverting / non-inverting), parameterised by op-amp model ---------
 
@@ -38,9 +44,11 @@ function invertingAmp(lmc662: boolean): Schematic {
     { id: 'Rf', kind: 'resistor', gx: 10, gy: 8, value: 22000 },
     { id: 'G1', kind: 'ground', gx: 8, gy: 4 },
     { id: 'P1', kind: 'scope1', gx: 16, gy: 5 },
+    { id: 'P2', kind: 'scope2', gx: 2, gy: 8 },   // 2+ on the input (CH2 = drive)
   ]
   const wires: Schematic['wires'] = [
     { x1: 2, y1: 6, x2: 4, y2: 6 },   // W1 -> Rin.a
+    { x1: 2, y1: 6, x2: 2, y2: 8 },   // input -> 2+
     { x1: 6, y1: 6, x2: 10, y2: 6 },  // Rin.b -> inN (summing node)
     { x1: 10, y1: 4, x2: 8, y2: 4 },  // inP -> ground
     { x1: 10, y1: 6, x2: 10, y2: 8 }, // inN -> Rf.a
@@ -63,9 +71,11 @@ function nonInvertingAmp(lmc662: boolean): Schematic {
     { id: 'Rg', kind: 'resistor', gx: 10, gy: 6, rotation: 1, value: 10000 },
     { id: 'G1', kind: 'ground', gx: 10, gy: 8 },
     { id: 'P1', kind: 'scope1', gx: 16, gy: 5 },
+    { id: 'P2', kind: 'scope2', gx: 6, gy: 2 },   // 2+ on the input (CH2 = drive)
   ]
   const wires: Schematic['wires'] = [
     { x1: 6, y1: 4, x2: 10, y2: 4 },  // W1 -> inP
+    { x1: 6, y1: 4, x2: 6, y2: 2 },   // input -> 2+
     { x1: 10, y1: 6, x2: 12, y2: 6 }, // inN -> Rf.a (Rg.a shares inN at 10,6)
     { x1: 14, y1: 6, x2: 14, y2: 5 }, // Rf.b -> out
     { x1: 14, y1: 5, x2: 16, y2: 5 }, // out -> 1+
@@ -82,24 +92,30 @@ function nonInvertingAmp(lmc662: boolean): Schematic {
 export const EXAMPLES: Example[] = [
   {
     id: 'divider', name: 'Voltage divider (÷2)', group: 'Passive',
-    blurb: 'Two equal resistors → −6 dB, flat with frequency.',
+    blurb: 'Two equal resistors halve the supply voltage. Lab-1 starter: the Power Supply V+ rail drives the divider — open the Voltmeter, where Channel 2 reads the applied V+ and Channel 1 reads the half-voltage midpoint. Change V+ on the Power Supply and watch both readings track.',
+    // V+ rail (Power Supply, default +5 V) drives the divider; read it and the midpoint on the
+    // Voltmeter. CH1 (scope1) = midpoint (2.5 V), CH2 (scope2) = applied V+ (5 V). 2 V/div frames both.
+    ch1Vdiv: 2, ch2Vdiv: 2,
     schematic: {
       components: [
-        { id: 'W1', kind: 'awg1', gx: 2, gy: 4 },
+        { id: 'VP', kind: 'vplus', gx: 2, gy: 4 },
         { id: 'R1', kind: 'resistor', gx: 4, gy: 4, value: 10000 },
         { id: 'R2', kind: 'resistor', gx: 6, gy: 4, rotation: 1, value: 10000 },
         { id: 'G1', kind: 'ground', gx: 6, gy: 6 },
-        { id: 'P1', kind: 'scope1', gx: 8, gy: 4 },
+        { id: 'P1', kind: 'scope1', gx: 8, gy: 4 },   // 1+ on the midpoint
+        { id: 'P2', kind: 'scope2', gx: 2, gy: 2 },   // 2+ on the applied V+
       ],
       wires: [
-        { x1: 2, y1: 4, x2: 4, y2: 4 },
-        { x1: 6, y1: 4, x2: 8, y2: 4 },
+        { x1: 2, y1: 4, x2: 4, y2: 4 },   // V+ -> R1.a (applied)
+        { x1: 2, y1: 4, x2: 2, y2: 2 },   // V+ -> 2+
+        { x1: 6, y1: 4, x2: 8, y2: 4 },   // midpoint -> 1+
       ],
     },
   },
   {
     id: 'rc-lp', name: 'RC low-pass (~1 kHz)', group: 'Passive',
     blurb: 'Series R, shunt C. −3 dB near 1 kHz, −20 dB/decade.',
+    w1: sine(1000), ch1Vdiv: 0.5,
     schematic: {
       components: [
         { id: 'W1', kind: 'awg1', gx: 2, gy: 4 },
@@ -117,6 +133,7 @@ export const EXAMPLES: Example[] = [
   {
     id: 'rc-hp', name: 'RC high-pass (~1 kHz)', group: 'Passive',
     blurb: 'Series C, shunt R. −3 dB near 1 kHz, +20 dB/decade below.',
+    w1: sine(1000), ch1Vdiv: 0.5,
     schematic: {
       components: [
         { id: 'W1', kind: 'awg1', gx: 2, gy: 4 },
@@ -134,6 +151,7 @@ export const EXAMPLES: Example[] = [
   {
     id: 'lc-lp', name: 'LC low-pass (~1.6 kHz)', group: 'Passive',
     blurb: 'Series L, shunt C. 2nd-order: resonant peak then −40 dB/decade.',
+    w1: sine(500), ch1Vdiv: 0.5,
     schematic: {
       components: [
         { id: 'W1', kind: 'awg1', gx: 2, gy: 4 },
@@ -151,6 +169,7 @@ export const EXAMPLES: Example[] = [
   {
     id: 'lc-hp', name: 'LC high-pass (~1.6 kHz)', group: 'Passive',
     blurb: 'Series C, shunt L. 2nd-order high-pass with a resonant peak.',
+    w1: sine(5000), ch1Vdiv: 0.5,
     schematic: {
       components: [
         { id: 'W1', kind: 'awg1', gx: 2, gy: 4 },
@@ -167,27 +186,32 @@ export const EXAMPLES: Example[] = [
   },
   {
     id: 'inv-ideal', name: 'Inverting amp ×−2.2 (ideal)', group: 'Amplifiers',
-    blurb: 'Ideal op-amp (simulation only, no supplies). Gain −Rf/Rin = −2.2.',
+    blurb: 'Ideal op-amp (simulation only, no supplies). Gain −Rf/Rin = −2.2 (CH2 in, CH1 out — note the inversion).',
+    w1: sine(1000), ch1Vdiv: 1, ch2Vdiv: 1,
     schematic: invertingAmp(false),
   },
   {
     id: 'inv-lmc662', name: 'Inverting amp ×−2.2 (LMC662)', group: 'Amplifiers',
-    blurb: 'Real LMC662 (needs ±5 V rails). Same gain; shows bandwidth + clipping.',
+    blurb: 'Real LMC662 (needs ±5 V rails). Same gain; shows bandwidth + clipping (CH2 in, CH1 out).',
+    w1: sine(1000), ch1Vdiv: 1, ch2Vdiv: 1,
     schematic: invertingAmp(true),
   },
   {
     id: 'noninv-ideal', name: 'Non-inverting amp ×2 (ideal)', group: 'Amplifiers',
-    blurb: 'Ideal op-amp (simulation only). Gain 1 + Rf/Rg = 2.',
+    blurb: 'Ideal op-amp (simulation only). Gain 1 + Rf/Rg = 2 (CH2 in, CH1 out — same phase, 2× taller).',
+    w1: sine(1000), ch1Vdiv: 1, ch2Vdiv: 1,
     schematic: nonInvertingAmp(false),
   },
   {
     id: 'noninv-lmc662', name: 'Non-inverting amp ×2 (LMC662)', group: 'Amplifiers',
-    blurb: 'Real LMC662 (needs ±5 V rails). Same gain; shows bandwidth + clipping.',
+    blurb: 'Real LMC662 (needs ±5 V rails). Same gain; shows bandwidth + clipping (CH2 in, CH1 out).',
+    w1: sine(1000), ch1Vdiv: 1, ch2Vdiv: 1,
     schematic: nonInvertingAmp(true),
   },
   {
     id: 'rlc-bandpass', name: 'RLC band-pass (~1.6 kHz)', group: 'Passive',
     blurb: 'Series L-C with output across R. Peaks at resonance (Q ≈ 7).',
+    w1: sine(1600), ch1Vdiv: 0.2,
     schematic: {
       components: [
         { id: 'W1', kind: 'awg1', gx: 2, gy: 4 },
@@ -267,7 +291,8 @@ export const EXAMPLES: Example[] = [
   },
   {
     id: 'summing', name: 'Summing amp (W1 + W2)', group: 'Amplifiers',
-    blurb: 'Inverting summer: out = −(W1 + W2). Drive both generators, see the sum on the scope.',
+    blurb: 'Inverting summer: out = −(W1 + W2). Both generators are preset (1 kHz + 2 kHz); the scope shows the composite sum, and you can see/edit W1 and W2 in the Signal Generator.',
+    w1: sine(1000), w2: sine(2000), ch1Vdiv: 0.5,
     schematic: {
       components: [
         { id: 'W1', kind: 'awg1', gx: 2, gy: 6 },

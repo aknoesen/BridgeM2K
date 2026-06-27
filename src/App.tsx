@@ -353,14 +353,14 @@ export default function App() {
       case 'schematic':
         return <SchematicEditor schematic={schematic} setSchematic={setSchematic}
           snapshot={snapshotSchematic} undo={undoSchematic} redo={redoSchematic}
-          onLoadGenerators={(w1) => setParams({ ...DEFAULT_PARAMS, ...w1 })}
+          onLoadGenerators={(w1, w2) => { if (w1) setParams({ ...DEFAULT_PARAMS, ...w1 }); setParams2(w2 ? { ...DEFAULT_PARAMS2, ...w2 } : DEFAULT_PARAMS2) }}
           onLoadScope={(req) => setScopeReq(req)} />
       case 'breadboard':
         return (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', minHeight: 0 }}>
             <div className="stacked-pane"><SchematicEditor schematic={schematic} setSchematic={setSchematic}
               snapshot={snapshotSchematic} undo={undoSchematic} redo={redoSchematic}
-              onLoadGenerators={(w1) => setParams({ ...DEFAULT_PARAMS, ...w1 })}
+              onLoadGenerators={(w1, w2) => { if (w1) setParams({ ...DEFAULT_PARAMS, ...w1 }); setParams2(w2 ? { ...DEFAULT_PARAMS2, ...w2 } : DEFAULT_PARAMS2) }}
           onLoadScope={(req) => setScopeReq(req)} /></div>
             <div className="stacked-pane"><Breadboard schematic={schematic} setSchematic={setSchematic} board={board} setBoard={setBoard}
               snapshotSchematic={snapshotSchematic}
@@ -372,14 +372,15 @@ export default function App() {
         return <NetworkAnalyzer circuit={drawnValid ? drawn.circuit : undefined} dutName={drawnValid ? 'your drawn circuit' : undefined}
           probes={drawnValid ? drawn.probes : undefined} tunables={tunables} onTune={tuneComponent} />
       case 'voltmeter':
-        return <Voltmeter circuit={drawn.circuit} w1={params} w2={params2} psu={psu} />
+        return <Voltmeter circuit={drawn.circuit} probes={drawn.probes} w1={params} w2={params2} psu={psu} />
       case 'psu':
         return <PowerSupply psu={psu} onChange={setPsu} circuit={drawn.circuit} w1={params} w2={params2} />
       case 'about':
         return <About />
       case 'siggen':
-        return <SignalGenerator params={params} signal={signal} running={running} compact={multi}
-          onParamChange={updateParam} onWaveTypeChange={(w: WaveType) => updateParam('waveType', w)}
+        return <SignalGenerator params={params} params2={params2} signal={signal} signal2={signal2} running={running} compact={multi}
+          onParamChange={updateParam} onParam2Change={(k, v) => setParams2(prev => ({ ...prev, [k]: v }))}
+          onWaveTypeChange={(w: WaveType) => updateParam('waveType', w)}
           onRunToggle={() => setRunning(r => !r)} />
       case 'spectrum':
         return <SpectrumAnalyzer params={params} signal={measured} params2={params2} signal2={measured2}

@@ -9,6 +9,10 @@ import './Instrument.css'
 
 interface Props {
   circuit: Circuit
+  // Actual probe node names from toCircuit (ch1/ch2 with optional differential '-' nodes). Reading
+  // these instead of hardcoded 'out'/'scope2' lets the voltmeter work when a probe shares a net with
+  // the input (e.g. the divider's 2+ on the applied-voltage node, which keeps its 'in' name).
+  probes?: { ch1?: string; ch1n?: string; ch2?: string; ch2n?: string }
   w1?: SignalParams
   w2?: SignalParams
   psu?: SupplySettings
@@ -23,7 +27,7 @@ const RANGES = [
 const CH1_COLOR = '#f0a030'
 const CH2_COLOR = '#40c0e0'
 
-export default function Voltmeter({ circuit, w1, w2, psu, compact }: Props) {
+export default function Voltmeter({ circuit, probes, w1, w2, psu, compact }: Props) {
   const engineRef = useRef<SpiceEngine | null>(null)
   const [range, setRange] = useState(0)
   const [ch1, setCh1] = useState<number | null>(null)
@@ -43,8 +47,10 @@ export default function Voltmeter({ circuit, w1, w2, psu, compact }: Props) {
       if (psu) ckt = applySupplyRails(ckt, psu)
       const nl = buildNetlist(ckt, { kind: 'op' })
       const r = await eng.run(nl)
-      setCh1(hasNode(r, 'out') ? differentialVoltage(r, 'out', hasNode(r, 'out_n') ? 'out_n' : '0') : null)
-      setCh2(hasNode(r, 'scope2') ? differentialVoltage(r, 'scope2', hasNode(r, 'scope2_n') ? 'scope2_n' : '0') : null)
+      const read = (pos?: string, neg?: string) =>
+        pos && hasNode(r, pos) ? differentialVoltage(r, pos, neg && hasNode(r, neg) ? neg : '0') : null
+      setCh1(read(probes?.ch1 ?? 'out', probes?.ch1n ?? 'out_n'))
+      setCh2(read(probes?.ch2 ?? 'scope2', probes?.ch2n ?? 'scope2_n'))
       setStatus('measured (.op)')
     } catch (e) {
       setCh1(null)
@@ -62,7 +68,7 @@ export default function Voltmeter({ circuit, w1, w2, psu, compact }: Props) {
   }, [])
   // Re-measure when the drawn circuit or generator settings change.
   useEffect(() => { void measure() // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [circuit, w1, w2, psu])
+  }, [circuit, probes, w1, w2, psu])
 
   const fmt = (v: number | null) => {
     if (v === null) return '—'

@@ -321,6 +321,7 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
   const groundNets = new Set<string>() // every ground symbol's net normalises to '0'
   let inNet: string | undefined
   let in2Net: string | undefined
+  let railNet: string | undefined // a DC supply rail (V+/V-) also counts as a source (DC labs)
   let outNet: string | undefined
   let outRefNet: string | undefined
   let scope2Net: string | undefined
@@ -334,9 +335,10 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
     else if (c.kind === 'adc2n') scope2RefNet = net
     else if (c.kind === 'vsource' || c.kind === 'awg1') inNet = net
     else if (c.kind === 'awg2') in2Net = net
+    else if (c.kind === 'vplus' || c.kind === 'vminus' || c.kind === 'dcrail') railNet = net
   }
   if (groundNets.size === 0) warnings.push('No ground — add a ground symbol.')
-  if (!inNet) warnings.push('No source — add a W1 generator output.')
+  if (!inNet && !railNet) warnings.push('No source — add a W1 generator output or a V+ supply rail.')
   if (!outNet) warnings.push('No output — add a Scope CH1 input probe.')
 
   // Connectivity checks: count real (non-marker) component terminals per net.
