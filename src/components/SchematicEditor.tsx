@@ -534,6 +534,8 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
                   snapshot()
                   setSch(JSON.parse(JSON.stringify(ex.schematic)))
                   setSelected(null); setSelectedWire(null)
+                  // Drop to the Select tool so the first click on the canvas doesn't drop a resistor.
+                  setTool('select'); setWireStart(null)
                   if (ex.w1 || ex.w2) onLoadGenerators?.(ex.w1, ex.w2)
                   onLoadScope?.({ xy: !!ex.xy, ch1Vdiv: ex.ch1Vdiv, ch2Vdiv: ex.ch2Vdiv })
                   setSimStatus('loaded example: ' + ex.name)
