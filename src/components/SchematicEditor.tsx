@@ -73,9 +73,13 @@ interface EditorProps {
   snapshot: () => void
   undo: () => void
   redo: () => void
+  // Apply an example's preset generator (W1) on load (e.g. a triangle sweep for an I-V curve).
+  onLoadGenerators?: (w1: import('../core/signal').SignalParams) => void
+  // Request the scope mode an example wants on load (true = XY for I-V curves, false = normal YT).
+  onLoadScope?: (xy: boolean) => void
 }
 
-export default function SchematicEditor({ schematic, setSchematic, snapshot, undo, redo }: EditorProps) {
+export default function SchematicEditor({ schematic, setSchematic, snapshot, undo, redo, onLoadGenerators }: EditorProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const sch = schematic
@@ -530,6 +534,7 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
                   snapshot()
                   setSch(JSON.parse(JSON.stringify(ex.schematic)))
                   setSelected(null); setSelectedWire(null)
+                  if (ex.w1) onLoadGenerators?.(ex.w1)
                   setSimStatus('loaded example: ' + ex.name)
                 }
               }}>

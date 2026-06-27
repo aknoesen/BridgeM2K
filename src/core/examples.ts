@@ -8,6 +8,7 @@
 // (b at (gx,gy+2)). Op-amp (kind 'opamp') pins unrotated at (gx,gy): inP (gx,gy), inN (gx,gy+2),
 // out (gx+4,gy+1); with opModel 'lmc662' it also exposes vpos (gx+2,gy-1) and vneg (gx+2,gy+3).
 import type { Schematic } from './schematic'
+import type { SignalParams } from './signal'
 
 export interface Example {
   id: string
@@ -15,6 +16,12 @@ export interface Example {
   group: 'Passive' | 'Amplifiers'
   blurb: string
   schematic: Schematic
+  // Optional generator (W1) preset applied on load — e.g. an I-V curve needs a triangle SWEEP, not
+  // the default square. Omit to leave the generator as the student has it.
+  w1?: SignalParams
+  // Optional scope mode applied on load: xy:true puts the oscilloscope in XY mode (I-V curves);
+  // omitted/false loads in normal time (YT) mode.
+  xy?: boolean
 }
 
 // --- shared amp skeletons (inverting / non-inverting), parameterised by op-amp model ---------
@@ -270,7 +277,9 @@ export const EXAMPLES: Example[] = [
   },
   {
     id: 'diode-iv', name: 'Diode I-V curve (XY)', group: 'Passive',
-    blurb: 'Switch the scope to XY mode: CH1 (X) is differential across the diode (V), CH2 (Y) reads the current (I·Rsense). Drive W1 with a sine/triangle — a few volts shows the full knee.',
+    blurb: 'Switch the scope to XY mode to see the curve. CH1 (X) = voltage across the diode, CH2 (Y) = current (I·Rsense). W1 is preset to a triangle sweep.',
+    w1: { waveType: 'triangle', frequency: 200, amplitude: 2, offset: 0, dutyCycle: 50, samplingRate: 100000, duration: 0.016 },
+    xy: true,
     schematic: {
       components: [
         { id: 'W1', kind: 'awg1', gx: 2, gy: 4 },
@@ -291,7 +300,9 @@ export const EXAMPLES: Example[] = [
   },
   {
     id: 'zener-iv', name: 'Zener I-V curve (XY)', group: 'Passive',
-    blurb: 'Same as the diode I-V but with a 3.3 V Zener: in XY mode you see the forward knee (~0.7 V) AND the reverse breakdown near −3.3 V (within the ±5 V drive). Drive W1 with a sine/triangle.',
+    blurb: 'In XY mode you see the forward knee (~0.7 V) AND the reverse breakdown near −3.3 V. W1 is preset to a ±4 V triangle sweep; if the forward current runs off the top, set CH2 to a coarser Volts/div.',
+    w1: { waveType: 'triangle', frequency: 200, amplitude: 4, offset: 0, dutyCycle: 50, samplingRate: 100000, duration: 0.016 },
+    xy: true,
     schematic: {
       components: [
         { id: 'W1', kind: 'awg1', gx: 2, gy: 4 },
