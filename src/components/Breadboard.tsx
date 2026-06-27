@@ -7,6 +7,7 @@ import {
   buildHoles, boardNets, boardWidth, boardHeight, PAD, PITCH, CHANNEL_SLOT,
   schematicExpectation, checkEquivalence, type BoardLayout, type CheckResult,
   dipPinHoles, dipCols, holeKey, DIP_TOP_ROW, DIP_BOT_ROW,
+  TERMINALS, type Terminal, POWER_WIRES,
 } from '../core/breadboard'
 import { type Schematic, type SchKind } from '../core/schematic'
 import { type SignalParams } from '../core/signal'
@@ -18,7 +19,6 @@ type Tool =
   | { kind: 'jumper' }
   | { kind: 'placePart'; id: string; partKind: SchKind }
   | { kind: 'placeDip'; id: string; partKind: SchKind }
-  | { kind: 'placePort'; port: string }
 
 const NET_COLORS = ['#f0a030', '#40c0e0', '#44dd88', '#e06fd0', '#d0d040', '#7a8cff', '#ff8855', '#55ddcc']
 
@@ -49,14 +49,26 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
   const [revealed, setRevealed] = useState(false)
 
   const W = boardWidth(), H = boardHeight()
-  const railY = (slot: number) => PAD + slot * PITCH
-  const pos = (key: string) => holeByKey.get(key)!
+  const STRIP = 48                 // height of each fixed M2K terminal strip
+  const OY = STRIP                 // board content shifts down to leave room for the top strip
+  const H2 = STRIP + H + STRIP     // total SVG height (top strip + board + bottom strip)
+  const railY = (slot: number) => PAD + slot * PITCH + OY
+  const termByKey = useMemo(() => new Map(TERMINALS.map((t) => [t.key, t])), [])
+  const termX = (t: Terminal) => PAD + (t.col - 1) * PITCH
+  const termY = (t: Terminal) => (t.side === 'top' ? STRIP - 18 : OY + H + 18)
+  const TERM_COLOR: Record<string, string> = { pos: '#e04040', neg: '#4a9eff', gnd: '#c9cdd2', signal: '#8fb3cf' }
+  // Absolute SVG position of any node key — a board hole or a fixed M2K terminal.
+  const pos = (key: string) => {
+    const h = holeByKey.get(key)
+    if (h) return { x: h.x, y: h.y + OY }
+    const t = termByKey.get(key)!
+    return { x: termX(t), y: termY(t) }
+  }
 
   // Colour the nodes the student has actually wired (any net with a leg / port / jumper).
   const activeColor = useMemo(() => {
     const used = new Set<string>()
     for (const p of board.parts) { used.add(nets.get(p.aHole)!); used.add(nets.get(p.bHole)!) }
-    for (const p of board.ports) used.add(nets.get(p.hole)!)
     for (const j of board.jumpers) { used.add(nets.get(j.a)!); used.add(nets.get(j.b)!) }
     for (const d of (board.dips ?? [])) for (const k of (dipPinHoles(d.kind, d.col) ?? [])) used.add(nets.get(k)!)
     const m = new Map<string, string>()
@@ -66,17 +78,25 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
   }, [board, nets])
 
   const showNets = mode === 'practice' || revealed
+  // A jumper touching a terminal takes that terminal's convention colour; a plain hole-to-hole
+  // jumper keeps its node colour.
+  const wireColor = (ak: string, bk: string) => {
+    const t = termByKey.get(ak) ?? termByKey.get(bk)
+    if (t) return TERM_COLOR[t.color]
+    const jnet = nets.get(ak)
+    return (showNets && jnet && activeColor.get(jnet)) || '#c9cdd2'
+  }
   const placedPart = new Map(board.parts.map((p) => [p.id, p]))
   const placedDip = new Map((board.dips ?? []).map((d) => [d.id, d]))
-  const placedPort = new Map(board.ports.map((p) => [p.port, p]))
 
-  function onHole(key: string) {
+  function onNode(key: string, isTerminal = false) {
     setCheck(null)
     if (tool.kind === 'jumper') {
       if (!pending) setPending(key)
       else { if (pending !== key) setBoard((b) => ({ ...b, jumpers: [...b.jumpers, { a: pending, b: key }] })); setPending(null) }
       return
     }
+    if (isTerminal) return // fixed M2K terminals: only jumpers attach to them
     if (tool.kind === 'placePart') {
       if (!pending) { setPending(key); return }
       if (pending === key) { setPending(null); return }
@@ -96,11 +116,6 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
       setBoard((b) => ({ ...b, dips: [...(b.dips ?? []).filter((d) => d.id !== tool.id), dip] }))
       setTool({ kind: 'select' })
       return
-    }
-    if (tool.kind === 'placePort') {
-      const port = tool.port
-      setBoard((b) => ({ ...b, ports: [...b.ports.filter((p) => p.port !== port), { port, hole: key }] }))
-      setTool({ kind: 'select' })
     }
   }
 
@@ -147,12 +162,12 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
       try {
         const d = JSON.parse(String(reader.result))
         const s = d.schematic, b = d.board
-        const isLab = s && Array.isArray(s.components) && Array.isArray(s.wires) && b && Array.isArray(b.parts) && Array.isArray(b.jumpers) && Array.isArray(b.ports)
+        const isLab = s && Array.isArray(s.components) && Array.isArray(s.wires) && b && Array.isArray(b.parts) && Array.isArray(b.jumpers)
         const isCircuit = Array.isArray(d.components) && Array.isArray(d.wires)
         if (isLab) {
           snapshotSchematic?.()
           setSchematic({ components: s.components, wires: s.wires })
-          setBoard({ parts: b.parts, jumpers: b.jumpers, ports: b.ports, dips: Array.isArray(b.dips) ? b.dips : [] })
+          setBoard({ parts: b.parts, jumpers: b.jumpers, ports: Array.isArray(b.ports) ? b.ports : [], dips: Array.isArray(b.dips) ? b.dips : [] })
           const g = d.generators
           if (g && g.w1 && g.w2 && onLoadGenerators) onLoadGenerators(g.w1, g.w2)
           setTool({ kind: 'select' }); setPending(null)
@@ -190,11 +205,20 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
           </div>
         </div>
         <div className="plotly-display" style={{ overflow: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 8 }}>
-          <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} style={{ maxWidth: '100%', height: 'auto' }}>
-            <rect x={2} y={2} width={W - 4} height={H - 4} rx={8} fill="#15171a" stroke="#333" />
+          <svg viewBox={`0 0 ${W} ${H2}`} width={W} height={H2} style={{ maxWidth: '100%', height: 'auto' }}>
+            {/* fixed M2K adaptor-board connector strips, top & bottom */}
+            <rect x={2} y={2} width={W - 4} height={STRIP - 8} rx={5} fill="#0f2c49" stroke="#1d4d7a" />
+            <rect x={2} y={OY + H + 6} width={W - 4} height={STRIP - 8} rx={5} fill="#0f2c49" stroke="#1d4d7a" />
+            {/* board body */}
+            <rect x={2} y={OY + 2} width={W - 4} height={H - 4} rx={8} fill="#15171a" stroke="#333" />
             {[0, 1, 15, 16].map((s) => (
               <line key={s} x1={PAD - 10} y1={railY(s)} x2={W - PAD + 10} y2={railY(s)}
                 stroke={s === 0 || s === 15 ? '#e04040' : '#4a9eff'} strokeOpacity={0.3} strokeWidth={2} />
+            ))}
+            {/* function label on each rail (outer = GND, top inner = V+, bottom inner = V−) */}
+            {([[0, 'GND', 'gnd'], [1, 'V+', 'pos'], [15, 'V−', 'neg'], [16, 'GND', 'gnd']] as const).map(([s, lbl, c]) => (
+              <text key={'rl' + s} x={W - PAD + 14} y={railY(s) + 3} fontSize={9} fontWeight={700}
+                fill={TERM_COLOR[c]} textAnchor="start">{lbl}</text>
             ))}
             <rect x={2} y={railY(CHANNEL_SLOT) - PITCH / 2} width={W - 4} height={PITCH} fill="#0d0d0d" />
             {holes.map((h) => {
@@ -205,18 +229,30 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
               const fill = hover ? '#ffffff' : (aCol ?? base)
               const r = (hover || pending === h.key) ? 4.4 : (aCol ? 3.6 : 3)
               return (
-                <circle key={h.key} cx={h.x} cy={h.y} r={r} fill={fill}
+                <circle key={h.key} cx={h.x} cy={h.y + OY} r={r} fill={fill}
                   stroke={pending === h.key ? '#fff' : '#000'} strokeWidth={pending === h.key ? 1.5 : 0.5}
                   style={{ cursor: 'pointer' }}
                   onMouseEnter={() => { if (mode === 'practice') setHoverNet(net) }}
                   onMouseLeave={() => setHoverNet(null)}
-                  onClick={() => onHole(h.key)} />
+                  onClick={() => onNode(h.key)} />
+              )
+            })}
+            {/* standard power distribution — always present, coloured by terminal, not deletable */}
+            {POWER_WIRES.map((w, i) => {
+              const a = pos(w.a), b = pos(w.b)
+              const col = TERM_COLOR[w.color]
+              return (
+                <g key={'pw' + i}>
+                  <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#000" strokeOpacity={0.5} strokeWidth={5} strokeLinecap="round" />
+                  <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={col} strokeWidth={3} strokeLinecap="round" strokeOpacity={0.92} />
+                  <circle cx={a.x} cy={a.y} r={4.4} fill={col} stroke="#000" strokeWidth={1} />
+                  <circle cx={b.x} cy={b.y} r={4.4} fill={col} stroke="#000" strokeWidth={1} />
+                </g>
               )
             })}
             {board.jumpers.map((j, i) => {
               const a = pos(j.a), b = pos(j.b)
-              const jnet = nets.get(j.a)
-              const col = (showNets && jnet && activeColor.get(jnet)) || '#c9cdd2'
+              const col = wireColor(j.a, j.b)
               return (
                 <g key={'j' + i} style={{ cursor: tool.kind === 'select' ? 'pointer' : 'default' }}
                   onClick={() => { if (tool.kind === 'select') { setBoard((bb) => ({ ...bb, jumpers: bb.jumpers.filter((_, k) => k !== i) })); setCheck(null) } }}>
@@ -262,13 +298,23 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
                 </g>
               )
             })}
-            {board.ports.map((p) => {
-              const h = pos(p.hole)
+            {TERMINALS.map((t) => {
+              const x = termX(t), y = termY(t)
+              const net = nets.get(t.key)
+              const aCol = showNets && net ? activeColor.get(net) : undefined
+              const c = TERM_COLOR[t.color]
+              const hover = mode === 'practice' && hoverNet === net
+              const labelY = t.side === 'top' ? y - 13 : y + 19
               return (
-                <g key={p.port} style={{ cursor: tool.kind === 'select' ? 'pointer' : 'default' }}
-                  onClick={() => { if (tool.kind === 'select') { setBoard((bb) => ({ ...bb, ports: bb.ports.filter((x) => x.port !== p.port) })); setCheck(null) } }}>
-                  <circle cx={h.x} cy={h.y} r={5} fill="none" stroke="#e0c020" strokeWidth={1.5} />
-                  <text x={h.x} y={h.y - 8} fontSize={8} fill="#e0c020" textAnchor="middle">{p.port}</text>
+                <g key={t.key} style={{ cursor: 'pointer' }}
+                  onMouseEnter={() => { if (mode === 'practice' && net) setHoverNet(net) }}
+                  onMouseLeave={() => setHoverNet(null)}
+                  onClick={() => onNode(t.key, true)}>
+                  <rect x={x - 9} y={y - 9} width={18} height={18} rx={3}
+                    fill={hover ? '#ffffff' : (aCol ?? '#15202c')}
+                    stroke={pending === t.key ? '#fff' : c} strokeWidth={pending === t.key ? 2 : 1.5} />
+                  <circle cx={x} cy={y} r={3.1} fill={c} stroke="#000" strokeWidth={0.5} />
+                  <text x={x} y={labelY} fontSize={9} fontWeight={700} fill={c} textAnchor="middle">{t.name}</text>
                 </g>
               )
             })}
@@ -285,7 +331,7 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
 
       <div className="settings-panel">
         <div className="section-title">Place from schematic</div>
-        {exp.parts.length === 0 && exp.dips.length === 0 && exp.ports.length === 0 ? (
+        {exp.parts.length === 0 && exp.dips.length === 0 ? (
           <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Draw a circuit in the Circuit tab above.</div>
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -301,14 +347,26 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
                 {placedDip.has(d.id) ? '✓ ' : ''}{d.id} (DIP)
               </button>
             ))}
-            {exp.ports.map((p) => (
-              <button key={p.name} style={chip(placedPort.has(p.name), tool.kind === 'placePort' && tool.port === p.name)}
-                onClick={() => { setTool({ kind: 'placePort', port: p.name }); setPending(null); setCheck(null) }}>
-                {placedPort.has(p.name) ? '✓ ' : ''}{p.name}
-              </button>
-            ))}
           </div>
         )}
+
+        <div className="section-title">M2K terminals</div>
+        <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+          The M2K connections are the fixed strips above and below the board — always there, like the
+          real adaptor board. Use the <b>Jumper</b> tool to wire one into your circuit.
+        </div>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 10, marginTop: 6 }}>
+          <span style={{ color: '#e04040' }}>● V+ (red)</span>
+          <span style={{ color: '#4a9eff' }}>● V− (blue)</span>
+          <span style={{ color: '#c9cdd2' }}>● GND</span>
+          <span style={{ color: '#8fb3cf' }}>● signals (1±, 2±, W1, W2, TI)</span>
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6, marginTop: 6 }}>
+          The power rails come pre-wired (kept that way on purpose): <b style={{ color: '#c9cdd2' }}>GND</b> on
+          both outer rails, <b style={{ color: '#e04040' }}>V+</b> on the top inner rail,
+          <b style={{ color: '#4a9eff' }}>V−</b> on the bottom inner rail — build from there. Jumpers from a
+          terminal carry that terminal's colour.
+        </div>
 
         <div className="section-title">Tools</div>
         <div className="wave-selector">
@@ -320,9 +378,8 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 8, lineHeight: 1.6 }}>
           {tool.kind === 'placePart' ? `Placing ${tool.id}: click two holes for its legs.`
             : tool.kind === 'placeDip' ? `Placing ${tool.id}: click a hole in row ${DIP_TOP_ROW} (top-left pin); the chip drops across the channel.`
-            : tool.kind === 'placePort' ? `Placing ${tool.port}: click a hole (a rail, for power/ground).`
-            : tool.kind === 'jumper' ? 'Jumper: click two holes to wire them together.'
-            : 'Select: click a placed part, port, or jumper to remove it.'}
+            : tool.kind === 'jumper' ? 'Jumper: click two points — a hole or an M2K terminal — to wire them together.'
+            : 'Select: click a placed part or jumper to remove it.'}
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 6 }}>
           {mode === 'practice' ? 'Practice: each node is coloured as you wire; hover a hole to highlight its node.'

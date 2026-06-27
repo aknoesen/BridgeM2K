@@ -36,6 +36,76 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-27 — F-5 fixed M2K connector strips on the breadboard — DONE
+
+**By:** Cowork session (andre)
+**Commit:** uncommitted
+
+**What I did:**
+- `core/breadboard.ts`: added always-present M2K terminals (`TERMINALS`) matching the UC Davis
+  adaptor board — top: 1+ 2+ GND V+ W1 GND TI; bottom: 1− 2− GND V− W2 GND. All GND terminals
+  collapse to one node (`GND_RAIL`); `PORT_TERMINAL` maps each schematic port to its fixed terminal.
+  `boardNets` now seeds terminals (3rd arg, defaulted). `checkEquivalence` anchors ports on the fixed
+  terminals (no more "place the port" step) — a port not jumpered to the circuit fails as a missing
+  jumper.
+- `components/Breadboard.tsx`: render two connector strips above/below the board (SVG grown by a strip
+  each side, board content offset by `OY`); terminals are color-coded (V+ red, V− blue, GND neutral,
+  signals muted blue) and jumper-able; removed the placeable-port tool/chips/render; added a terminal
+  legend + help. Save/load tolerant of older boards that still carry `ports`.
+- Standard power distribution: `POWER_WIRES` (in `core/breadboard.ts`) is always present and folded
+  into `boardNets` — GND→both outer rails, V+→top inner rail, V−→bottom inner rail. Rendered as fixed,
+  non-deletable colour-coded wires; rails labelled GND/V+/V−. Jumpers touching a terminal now take the
+  terminal's colour (`wireColor`). Verified: outer rails read GND, inner rails read V+/V−, and a
+  resistor powered straight from the rails passes Check.
+- Verified by a node script: all GND terminals one node; V+ distinct; jumper unions terminal↔hole;
+  a correctly wired single-R (V+→R→GND) board passes Check; dropping the GND jumper fails with
+  "R1 pin B and GND should be the same node — run a jumper."
+
+**Verification (Definition of Done):**
+- build clean: `tsc --noEmit` clean. `vite build` not runnable in sandbox (rolldown native binding);
+  run `npm run build` locally before deploy.
+- 12-bit floor at −104 dBFS: unaffected — no `core/signal.ts` changes.
+- math/logic sanity: net-partition checks above all pass.
+
+**State for the next session:**
+- `BoardLayout.ports` is now vestigial (kept for back-compat / old files); the flow uses fixed
+  terminals. Could be removed in a later cleanup. F-4 (more DIP footprints) still TODO.
+
+**Open questions / flags for andre:**
+- Confirm `npm run build` (Vite) clean locally; eyeball the strip layout/label spacing on screen.
+
+---
+
+### 2026-06-27 — QS-2 Quickstart guided sequence + return-hint — DONE
+
+**By:** Cowork session (andre)
+**Commit:** uncommitted
+
+**What I did:**
+- Quickstart: added three guided sections after Lab 1 — (1) Signal Generator + Oscilloscope (YT, then
+  XY with the Zener I-V as the showcase), (2) Network Analyzer + a digitization/**dBFS** explainer with
+  an inline themed SVG (0 dBFS = full scale ±2.5 V; 4/8/12-bit floors at −56/−80/−104 dBFS; the 12-bit
+  one emphasised), pointing at the Spectrum Learning Mode, (3) circuit/simulation → breadboard transfer
+  (Check / Practice vs Bench). All steps drive the app via onGoTo/onLoadExample.
+- Earlier in this session: single-ended vs differential SVG in the intro; "return to Quickstart" gold
+  pulse on the nav button once opened (`.nav-hint` in App.css, `quickstartSeen` + nav-btn `hint` arg).
+- Docs: spec updated; ROADMAP QS-2 → DONE, QS-3 (figures + TWIN deep-links) added.
+
+**Verification (Definition of Done):**
+- build clean: `tsc --noEmit` clean. `vite build` still cannot run in sandbox (rolldown native binding);
+  run `npm run build` locally before deploy.
+- 12-bit floor at −104 dBFS: unaffected — no `core/` changes (Quickstart is static UI).
+- sanity: dBFS diagram floors match CLAUDE.md (4-bit −56, 8-bit −80, 12-bit −104).
+
+**State for the next session:**
+- Quickstart now covers the full EEC1 instrument arc. QS-3 = real figures/screenshots + Lab `<!-- TWIN: -->`
+  deep-links remain.
+
+**Open questions / flags for andre:**
+- Confirm `npm run build` (Vite) clean locally before deploy.
+
+---
+
 ### 2026-06-27 — QS-1 In-app Quickstart (Track H) — DONE
 
 **By:** Cowork session (andre)

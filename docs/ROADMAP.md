@@ -133,6 +133,7 @@ Spec: `docs/specs/breadboard.md`
 | F-2 | Drag 2-pin parts from schematic + jumpers + verification loop (board ≟ schematic) | F-1 | DONE |
 | F-3 | DIP/IC footprints on the board — LMC662 8-pin DIP (generic DIP framework; op-amp/INA are a trivial follow-on) | F-2 | DONE |
 | F-4 | (Stretch) remaining DIP footprints (op-amp, INA) + optional "show one valid layout" hint | F-3 | TODO |
+| F-5 | Fixed M2K connector strips (top: 1+ 2+ GND V+ W1 GND TI; bottom: 1− 2− GND V− W2 GND), color-coded V+ red / V− blue / GND neutral, replacing placeable ports — jumper from them; Check anchors on the terminals. Standard power distribution pre-wired & always-present (GND→both outer rails, V+→top inner, V−→bottom inner), rails labelled; terminal jumpers carry the terminal's colour | F-2 | DONE |
 
 Decisions (locked with andre, 2026-06-26):
 - **Verification loop is the centerpiece** — Check tells the student if their board is electrically
@@ -173,7 +174,8 @@ Spec: `docs/specs/quickstart.md`
 | Phase | Title | Depends on | Status |
 |-------|-------|-----------|--------|
 | QS-1 | In-app Quickstart panel (nav button + Welcome link): M2K↔app bridge + Lab 1 walkthrough (divider on Power Supply + Voltmeter), with step buttons that load examples and jump to instruments | examples.ts | DONE |
-| QS-2 | Guided instrument sequence after the Voltmeter: Signal Gen + Scope (YT then XY, Zener I-V showcase) → Network Analyzer + digitization/dBFS explainer → circuit/sim → board transfer. See spec. | QS-1 | TODO |
+| QS-2 | Guided instrument sequence after the Voltmeter: Signal Gen + Scope (YT then XY, Zener I-V showcase) → Network Analyzer + digitization/dBFS explainer (with diagram) → circuit/sim → board transfer. See spec. | QS-1 | DONE |
+| QS-3 | (Future) figures/screenshots; hook Lab prelab `<!-- TWIN: -->` markers to deep-link steps | QS-2 | TODO |
 
 Notes:
 - **Goal:** get a general (non-CC) user going. Open an example → see it framed → understand

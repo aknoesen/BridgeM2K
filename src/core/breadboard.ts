@@ -74,7 +74,7 @@ export interface Jumper { a: string; b: string } // hole keys
 // Union-find over hole keys: seed by internal group, then union jumpers. Returns holeKey → net.
 // (Component legs are added in F-2; legs do NOT union to each other — a 2-terminal part bridges
 // two nets, it does not short them.)
-export function boardNets(holes: Hole[], jumpers: Jumper[] = []): Map<string, string> {
+export function boardNets(holes: Hole[], jumpers: Jumper[] = [], terminals: Terminal[] = TERMINALS): Map<string, string> {
   const parent = new Map<string, string>()
   const ensure = (k: string) => { if (!parent.has(k)) parent.set(k, k) }
   const find = (a: string): string => {
@@ -96,6 +96,15 @@ export function boardNets(holes: Hole[], jumpers: Jumper[] = []): Map<string, st
     if (rep === undefined) groupRep.set(h.group, h.key)
     else union(h.key, rep)
   }
+  // Fixed M2K terminals join the same graph; all GND terminals collapse to one node.
+  for (const t of terminals) {
+    ensure(t.key)
+    const g = terminalGroup(t)
+    const rep = groupRep.get(g)
+    if (rep === undefined) groupRep.set(g, t.key)
+    else union(t.key, rep)
+  }
+  for (const w of POWER_WIRES) union(w.a, w.b) // standard, always-present power distribution
   for (const j of jumpers) union(j.a, j.b)
 
   const name = new Map<string, string>()
@@ -119,6 +128,75 @@ export const PORT_NAME: Partial<Record<SchKind, string>> = {
 }
 // 2-pin parts a student places on the board (F-2). DIP parts (op-amp/in-amp) are F-3.
 export const PLACEABLE_KINDS = new Set<SchKind>(['resistor', 'capacitor', 'inductor'])
+
+// ── F-5: fixed M2K connector strips (always present) ─────────────────────────────
+// Mirrors the UC Davis adaptor board's two 1×15 headers: the M2K signals come out on fixed
+// terminals top and bottom, and the student jumpers from them into the breadboard. Each terminal
+// is a fixed node in the net graph; ALL GND terminals share one node (the M2K ground). `port` ties
+// a terminal to a schematic port for the equivalence check; TI (trigger-in) is unused in-course
+// and carries no port. `color` drives the course wiring convention (red +V, blue −V, neutral GND).
+export type TermColor = 'pos' | 'neg' | 'gnd' | 'signal'
+export interface Terminal { key: string; name: string; port?: string; side: 'top' | 'bottom'; col: number; color: TermColor }
+const GND_GROUP = 'GND_RAIL'
+
+const TOP_DEF: { name: string; port?: string; color: TermColor }[] = [
+  { name: '1+', port: '1+', color: 'signal' },
+  { name: '2+', port: '2+', color: 'signal' },
+  { name: 'GND', port: 'GND', color: 'gnd' },
+  { name: 'V+', port: 'V+', color: 'pos' },
+  { name: 'W1', port: 'W1', color: 'signal' },
+  { name: 'GND', port: 'GND', color: 'gnd' },
+  { name: 'TI', color: 'signal' },
+]
+const BOT_DEF: { name: string; port?: string; color: TermColor }[] = [
+  { name: '1-', port: '1-', color: 'signal' },
+  { name: '2-', port: '2-', color: 'signal' },
+  { name: 'GND', port: 'GND', color: 'gnd' },
+  { name: 'V-', port: 'V-', color: 'neg' },
+  { name: 'W2', port: 'W2', color: 'signal' },
+  { name: 'GND', port: 'GND', color: 'gnd' },
+]
+
+// Spread n terminals across the board with a 2-column margin each side, aligned to hole columns.
+function spreadCols(n: number): number[] {
+  const span = COLS - 4
+  return Array.from({ length: n }, (_, i) => Math.round(3 + (span * i) / (n - 1)))
+}
+
+export const TERMINALS: Terminal[] = (() => {
+  const out: Terminal[] = []
+  spreadCols(TOP_DEF.length).forEach((col, i) => out.push({ key: `TT${i}`, ...TOP_DEF[i], side: 'top', col }))
+  spreadCols(BOT_DEF.length).forEach((col, i) => out.push({ key: `TB${i}`, ...BOT_DEF[i], side: 'bottom', col }))
+  return out
+})()
+
+// Net-seed group for a terminal (all GND terminals collapse to one node).
+const terminalGroup = (t: Terminal): string => (t.color === 'gnd' ? GND_GROUP : `TERM_${t.key}`)
+
+// port name → the terminal key that provides it (first match; GND resolves to the shared node).
+export const PORT_TERMINAL: Record<string, string> = (() => {
+  const m: Record<string, string> = {}
+  for (const t of TERMINALS) if (t.port && !(t.port in m)) m[t.port] = t.key
+  return m
+})()
+
+// Standard power distribution, always present (modelling the habit students should keep): GND to the
+// two OUTER rails (top TP, bottom BN), V+ to the top INNER rail (TN), V− to the bottom INNER rail
+// (BP). Each wire is coloured by its terminal. These are fixed (not user jumpers) so the rails are
+// always powered and the convention is always visible.
+export interface PowerWire { a: string; b: string; color: TermColor }
+export const POWER_WIRES: PowerWire[] = (() => {
+  const topGnd = TERMINALS.find((t) => t.side === 'top' && t.color === 'gnd')!
+  const botGnd = TERMINALS.find((t) => t.side === 'bottom' && t.color === 'gnd')!
+  const vp = TERMINALS.find((t) => t.port === 'V+')!
+  const vn = TERMINALS.find((t) => t.port === 'V-')!
+  return [
+    { a: topGnd.key, b: holeKey('TP', topGnd.col), color: 'gnd' }, // GND → top outer rail
+    { a: botGnd.key, b: holeKey('BN', botGnd.col), color: 'gnd' }, // GND → bottom outer rail
+    { a: vp.key, b: holeKey('TN', vp.col), color: 'pos' },         // V+  → top inner rail
+    { a: vn.key, b: holeKey('BP', vn.col), color: 'neg' },         // V−  → bottom inner rail
+  ]
+})()
 
 // DIP/IC parts placed on the board (F-3). Unlike a 2-pin part, every pin is its own net and the
 // body must straddle the center channel: pins sit in the two channel-adjacent term rows (e and f),
@@ -200,11 +278,10 @@ export function checkEquivalence(s: Schematic, board: BoardLayout, holes: Hole[]
   }
   const placedPart = new Map(board.parts.map((p) => [p.id, p]))
   const placedDip = new Map((board.dips ?? []).map((d) => [d.id, d]))
-  const placedPort = new Map(board.ports.map((p) => [p.port, p]))
 
   for (const p of exp.parts) if (!placedPart.has(p.id)) return { ok: false, message: `Place ${p.id} on the board.` }
   for (const d of exp.dips) if (!placedDip.has(d.id)) return { ok: false, message: `Place ${d.id} on the board (straddle the channel).` }
-  for (const p of exp.ports) if (!placedPort.has(p.name)) return { ok: false, message: `Place the ${p.name} connection on the board.` }
+  // Ports are the always-present M2K terminals now; the student jumpers from them (no placement step).
 
   const bnets = boardNets(holes, board.jumpers)
   const bn = (k: string) => bnets.get(k) ?? `?${k}`
@@ -225,7 +302,7 @@ export function checkEquivalence(s: Schematic, board: BoardLayout, holes: Hole[]
     })
   }
   for (const p of exp.ports) {
-    schem.set(p.name, p.net); brd.set(p.name, bn(placedPort.get(p.name)!.hole))
+    schem.set(p.name, p.net); brd.set(p.name, bn(PORT_TERMINAL[p.name] ?? `?${p.name}`))
   }
 
   const pins = [...schem.keys()]
