@@ -242,7 +242,7 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
               const a = pos(w.a), b = pos(w.b)
               const col = TERM_COLOR[w.color]
               return (
-                <g key={'pw' + i}>
+                <g key={'pw' + i} style={{ pointerEvents: 'none' }}>
                   <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#000" strokeOpacity={0.5} strokeWidth={5} strokeLinecap="round" />
                   <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={col} strokeWidth={3} strokeLinecap="round" strokeOpacity={0.92} />
                   <circle cx={a.x} cy={a.y} r={4.4} fill={col} stroke="#000" strokeWidth={1} />
@@ -254,7 +254,7 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
               const a = pos(j.a), b = pos(j.b)
               const col = wireColor(j.a, j.b)
               return (
-                <g key={'j' + i} style={{ cursor: tool.kind === 'select' ? 'pointer' : 'default' }}
+                <g key={'j' + i} style={{ cursor: tool.kind === 'select' ? 'pointer' : 'default', pointerEvents: tool.kind === 'select' ? 'auto' : 'none' }}
                   onClick={() => { if (tool.kind === 'select') { setBoard((bb) => ({ ...bb, jumpers: bb.jumpers.filter((_, k) => k !== i) })); setCheck(null) } }}>
                   {/* shadow lifts the jumper visually above the board */}
                   <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#000" strokeOpacity={0.55} strokeWidth={5.5} strokeLinecap="round" />
@@ -270,7 +270,7 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
               const a = pos(p.aHole), b = pos(p.bHole)
               const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2
               return (
-                <g key={p.id} style={{ cursor: tool.kind === 'select' ? 'pointer' : 'default' }}
+                <g key={p.id} style={{ cursor: tool.kind === 'select' ? 'pointer' : 'default', pointerEvents: tool.kind === 'select' ? 'auto' : 'none' }}
                   onClick={() => { if (tool.kind === 'select') { setBoard((bb) => ({ ...bb, parts: bb.parts.filter((x) => x.id !== p.id) })); setCheck(null) } }}>
                   <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--ch1-color)" strokeWidth={2} />
                   <rect x={mx - 11} y={my - 7} width={22} height={14} rx={2} fill="var(--bg-panel)" stroke="var(--ch1-color)" />
@@ -284,7 +284,7 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
               const tl = pos(holeKey(DIP_TOP_ROW, d.col)), br = pos(holeKey(DIP_BOT_ROW, d.col + n - 1))
               const bx = tl.x - 7, by = tl.y - 7, bw = (br.x - tl.x) + 14, bh = (br.y - tl.y) + 14
               return (
-                <g key={d.id} style={{ cursor: tool.kind === 'select' ? 'pointer' : 'default' }}
+                <g key={d.id} style={{ cursor: tool.kind === 'select' ? 'pointer' : 'default', pointerEvents: tool.kind === 'select' ? 'auto' : 'none' }}
                   onClick={() => { if (tool.kind === 'select') { setBoard((bb) => ({ ...bb, dips: (bb.dips ?? []).filter((x) => x.id !== d.id) })); setCheck(null) } }}>
                   <rect x={bx} y={by} width={bw} height={bh} rx={3} fill="#1b1b1f" stroke="#888" strokeWidth={1} />
                   {/* notch on the left edge marks pin-1 end (datasheet orientation) */}
