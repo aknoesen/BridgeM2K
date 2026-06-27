@@ -34,3 +34,8 @@ Video/
 *.mp4
 *.mov
 desktop.ini
+
+# Stray local files — a one-off circuit folder and scratch verification scripts, not part of the app
+Mk2 Digital Twin/
+_*.mts
+.synctest.txt
