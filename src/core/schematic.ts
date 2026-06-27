@@ -69,6 +69,8 @@ export function baseTerminals(kind: SchKind): SchTerminal[] {
         { name: 'inP', gx: 0, gy: 0 },
         { name: 'inN', gx: 0, gy: 2 },
         { name: 'out', gx: 4, gy: 1 },
+        { name: 'vpos', gx: 2, gy: -1 }, // V+ power pin (top)
+        { name: 'vneg', gx: 2, gy: 3 },  // V- power pin (bottom)
       ]
     case 'inamp':
     case 'inamp3':
@@ -220,7 +222,7 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
   const netOf = (gx: number, gy: number) => nets.get(key(gx, gy)) ?? `net_${gx}_${gy}`
   const warnings: string[] = []
 
-  let groundNet: string | undefined
+  const groundNets = new Set<string>() // every ground symbol's net normalises to '0'
   let inNet: string | undefined
   let in2Net: string | undefined
   let outNet: string | undefined
@@ -229,7 +231,7 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
   let scope2RefNet: string | undefined
   for (const c of s.components) {
     const net = netOf(terminalsOf(c)[0].gx, terminalsOf(c)[0].gy)
-    if (c.kind === 'ground') groundNet = net
+    if (c.kind === 'ground') groundNets.add(net)
     else if (c.kind === 'probe' || c.kind === 'scope1') outNet = net
     else if (c.kind === 'adc1n') outRefNet = net
     else if (c.kind === 'scope2') scope2Net = net
@@ -237,7 +239,7 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
     else if (c.kind === 'vsource' || c.kind === 'awg1') inNet = net
     else if (c.kind === 'awg2') in2Net = net
   }
-  if (!groundNet) warnings.push('No ground — add a ground symbol.')
+  if (groundNets.size === 0) warnings.push('No ground — add a ground symbol.')
   if (!inNet) warnings.push('No source — add a W1 generator output.')
   if (!outNet) warnings.push('No output — add a Scope CH1 input probe.')
 
@@ -259,7 +261,7 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
   }
 
   const rename = (net: string) =>
-    net === groundNet ? '0'
+    groundNets.has(net) ? '0'
       : net === inNet ? 'in'
       : net === in2Net ? 'in2'
       : net === outNet ? 'out'
@@ -298,6 +300,8 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
           inP: rename(netOf(ts[0].gx, ts[0].gy)),
           inN: rename(netOf(ts[1].gx, ts[1].gy)),
           out: rename(netOf(ts[2].gx, ts[2].gy)),
+          vpos: rename(netOf(ts[3].gx, ts[3].gy)),
+          vneg: rename(netOf(ts[4].gx, ts[4].gy)),
         },
       })
     } else if (c.kind === 'inamp' || c.kind === 'inamp3') {
@@ -323,7 +327,7 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
     }
     // ground / probe / scope1 (1+) / scope2 (2+) / adc1n (1-) / adc2n (2-) are markers.
   }
-  if (groundNet) comps.push({ kind: 'ground', id: '0', node: '0' })
+  if (groundNets.size > 0) comps.push({ kind: 'ground', id: '0', node: '0' })
 
   const probes = {
     ch1: outNet ? rename(outNet) : undefined,

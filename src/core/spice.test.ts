@@ -296,6 +296,43 @@ describe('LMC662 behavioural op-amp', () => {
     expect(v).toBeCloseTo(20, 0)
   }, 30000)
 
+  it('output clips to the WIRED rails, not a fixed value (±2.5 V)', async () => {
+    const ckt: Ckt = {
+      title: 'rail clip',
+      components: [
+        { kind: 'vsource', id: '1', nodes: ['in', '0'], dc: 2 },
+        { kind: 'opamp', id: '1', model: 'lmc662', nodes: { inP: 'in', inN: 'fb', out: 'out', vpos: 'vp', vneg: 'vn' } },
+        { kind: 'resistor', id: 'f', nodes: ['out', 'fb'], ohms: 9000 },
+        { kind: 'resistor', id: 'g', nodes: ['fb', '0'], ohms: 1000 },
+        { kind: 'dcrail', id: 'P', node: 'vp', volts: 2.5 },
+        { kind: 'dcrail', id: 'N', node: 'vn', volts: -2.5 },
+        { kind: 'ground', id: '0', node: '0' },
+      ],
+    }
+    const sim = new Simulation(); await sim.start()
+    sim.setNetList(buildNetlist(ckt, { kind: 'op' }))
+    const v = nodeVoltage(normalizeResult(await sim.runSim()), 'out')
+    expect(v).toBeGreaterThan(2.3)
+    expect(v).toBeLessThan(2.7) // clipped at the +2.5 V rail, not +5 V or 20 V
+  }, 30000)
+
+  it('an unpowered op-amp (rails left floating) sits dead at 0 V', async () => {
+    const ckt: Ckt = {
+      title: 'unpowered',
+      components: [
+        { kind: 'vsource', id: '1', nodes: ['in', '0'], dc: 2 },
+        { kind: 'opamp', id: '1', model: 'lmc662', nodes: { inP: 'in', inN: 'fb', out: 'out', vpos: 'vp', vneg: 'vn' } },
+        { kind: 'resistor', id: 'f', nodes: ['out', 'fb'], ohms: 9000 },
+        { kind: 'resistor', id: 'g', nodes: ['fb', '0'], ohms: 1000 },
+        { kind: 'ground', id: '0', node: '0' },
+      ],
+    }
+    const sim = new Simulation(); await sim.start()
+    sim.setNetList(buildNetlist(ckt, { kind: 'op' }))
+    const v = nodeVoltage(normalizeResult(await sim.runSim()), 'out')
+    expect(Math.abs(v)).toBeLessThan(0.1) // no power → no output
+  }, 30000)
+
   it('slew-rate limits a fast large signal (~1.1 V/µs)', async () => {
     // Unity follower driven by a 3 V, 200 kHz sine. Required slope (2*pi*f*A ≈ 3.8 V/µs) exceeds
     // the 1.1 V/µs slew rate, so the output is slew-limited — its max |dV/dt| ≈ SR.

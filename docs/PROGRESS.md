@@ -36,6 +36,42 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-26 — OPAMP-PWR: real V+/V− power pins (+ multi-ground fix) — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**Why:** andre asked for a faithful op-amp — real power pins wired to the supply, and the scope's
+1− tied to ground — so the twin matches the bench and the breadboard transfer.
+
+**What I did:**
+- `core/schematic.ts`: the op-amp is now a **5-pin part** — added `vpos`/`vneg` terminals; `toCircuit`
+  maps them to nets and passes them to the OpAmp.
+- `core/netlist.ts`: the LMC662 output now clips to the **actual wired rail voltages** `V(vpos)/V(vneg)`,
+  with 1 TΩ bleed resistors so an unpowered op-amp (rails floating) sits **dead at 0 V**, like the bench.
+  No power pins (a Circuit built directly in tests) → fixed ±5 V fallback. Ideal op-amp ties any wired
+  rail to 0 (ignored functionally) so it never floats.
+- **Multi-ground fix (real bug andre's circuit hit):** `toCircuit` tracked only the *last* ground symbol
+  as node 0, so a second ground left the first one's net (e.g. the +input ground) floating. Now **every**
+  ground symbol normalises to 0 (`groundNets` set). This is what let the 1−→GND probe and the +input
+  ground coexist.
+- `SchematicEditor.tsx`: op-amp symbol now draws red **V+** (top) and blue **V−** (bottom) power stubs.
+- `core/spice.test.ts` (+2): output clips to the wired rails (±2.5 V), and an unpowered op-amp → 0 V.
+  `core/schematic.test.ts` (+1): two grounds both map to 0 and the op-amp exposes V+/V− nets.
+- Rebuilt `Mk2 Digital Twin/inverting-amp-LMC662.json`: +input grounded, **V+/V− wired to V+/V− supply
+  pins**, output on Scope 1 (1+), **1− tied to GND** via a second ground. Validated end-to-end: no
+  warnings, ~20 dB inverting gain with the LMC662 rolloff, and the output clips at the +5 V rail when
+  overdriven.
+
+**Verification:** build clean; **71 passed (68 prior + 2 clip/unpowered + 1 multi-ground)**; 12-bit floor holds.
+
+**State for the next session:** op-amps are 5-pin and must be powered to work (unpowered → 0 V). Existing
+op-amp circuits without power wired will now read 0 at the output — that's intended fidelity, but note it
+when loading old saves. The clip rails follow whatever you wire (PSU or V+/V− ports). Not yet: rail values
+auto-tracking the PSU in the Network Analyzer's own sweep (it uses the V+/V− port defaults ±5).
+
+---
+
 ### 2026-06-26 — LMC662: add slew-rate limiting — DONE
 
 **By:** Claude Code session (in Cowork)

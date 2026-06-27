@@ -211,30 +211,38 @@ function inampLines(c: InAmp, n: (net: Net) => string): string[] {
 }
 
 // Op-amp emission. Ideal → one VCVS. LMC662 → transconductance macromodel + rail clip (see OpAmp).
+// The op-amp may carry V+/V− power nets (vpos/vneg). When wired, the LMC662 output clips to the
+// ACTUAL rail voltages V(vpos)/V(vneg); a 1 TΩ bleed ties any rail to 0 so an unpowered op-amp
+// (rails left floating) sits dead at 0 V, just like the bench. When no power pins are present
+// (e.g. a Circuit built directly in tests), it falls back to the fixed ±5 V default.
 function opampLines(c: OpAmp, n: (net: Net) => string): string[] {
   const inP = n(c.nodes.inP), inN = n(c.nodes.inN), out = n(c.nodes.out)
+  const vpos = c.nodes.vpos ? n(c.nodes.vpos) : undefined
+  const vneg = c.nodes.vneg ? n(c.nodes.vneg) : undefined
+  const bleed: string[] = []
+  if (vpos) bleed.push(`Rvp${c.id} ${vpos} 0 1e12`)
+  if (vneg) bleed.push(`Rvn${c.id} ${vneg} 0 1e12`)
+
   if ((c.model ?? 'ideal') === 'ideal') {
-    return [`E${c.id} ${out} 0 ${inP} ${inN} ${fmt(c.gain ?? 1e6)}`]
+    return [`E${c.id} ${out} 0 ${inP} ${inN} ${fmt(c.gain ?? 1e6)}`, ...bleed]
   }
   // LMC662 macromodel: a transconductance stage (gm) drives the dominant-pole capacitor Cp.
-  // Three datasheet numbers fall out of this topology at once:
   //   open-loop gain  Aol = gm·Rp           → Rp = Aol/gm
   //   gain·bandwidth  GBW = gm/(2π·Cp)      → Cp = gm/(2π·GBW)
   //   slew rate       SR  = Imax/Cp         → clamp the gm current at ±Imax = SR·Cp
-  // The B current source clamps the stage current (→ slew limit); the B voltage source clamps
-  // the output to the rails (→ clipping). gm is a free scale; pick 1 mA/V for sane R/C values.
   const gm = 1e-3
   const cp = gm / (2 * Math.PI * LMC662.gbw)
   const rp = LMC662.aol / gm
   const imax = LMC662.slewVPerUs * 1e6 * cp // SR in V/s × Cp
-  const vp = c.supplyPos ?? 5
-  const vn = c.supplyNeg ?? -5
   const o = `xop${c.id}_o`
+  const clipHi = vpos ? `V(${vpos})` : fmt(c.supplyPos ?? 5)
+  const clipLo = vneg ? `V(${vneg})` : fmt(c.supplyNeg ?? -5)
   return [
     `Bg${c.id} 0 ${o} I = max(${(-imax).toExponential(6)}, min(${imax.toExponential(6)}, ${gm}*(V(${inP})-V(${inN}))))`,
     `Rp${c.id} ${o} 0 ${fmt(rp)}`,                        // DC gain leg (gm·Rp = Aol)
     `Cp${c.id} ${o} 0 ${fmt(cp)}`,                        // dominant pole + slew integrator
-    `Bo${c.id} ${out} 0 V = max(${fmt(vn)}, min(${fmt(vp)}, V(${o})))`, // rail-to-rail output clip
+    ...bleed,
+    `Bo${c.id} ${out} 0 V = max(${clipLo}, min(${clipHi}, V(${o})))`, // output clip to the rails
   ]
 }
 

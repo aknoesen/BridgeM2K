@@ -186,3 +186,23 @@ describe('AWG output impedance (49.9 Ohm, R132)', () => {
     expect(nodeVoltage(r, 'in')).toBeCloseTo(0.5, 2)
   }, 30000)
 })
+
+describe('multi-ground + op-amp power pins (toCircuit)', () => {
+  it('every ground symbol normalises to 0; op-amp exposes V+/V- nets', () => {
+    const sch: Schematic = {
+      components: [
+        { id: 'U1', kind: 'opamp', gx: 6, gy: 2, opModel: 'lmc662' }, // inP(6,2) inN(6,4) out(10,3) vpos(8,1) vneg(8,5)
+        { id: 'G1', kind: 'ground', gx: 4, gy: 2 }, // wired to inP
+        { id: 'G2', kind: 'ground', gx: 8, gy: 9 }, // a SECOND, separate ground
+      ],
+      wires: [{ x1: 6, y1: 2, x2: 4, y2: 2 }], // inP -> G1
+    }
+    const d = toCircuit(sch, 't')
+    const op = d.circuit.components.find((c) => c.kind === 'opamp') as
+      { nodes: { inP: string; vpos?: string; vneg?: string } }
+    expect(op.nodes.inP).toBe('0') // grounded via G1 even though G2 is the last ground seen
+    expect(op.nodes.vpos).toBeTruthy()
+    expect(op.nodes.vneg).toBeTruthy()
+    expect(op.nodes.vpos).not.toBe(op.nodes.vneg)
+  })
+})

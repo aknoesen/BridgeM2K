@@ -541,12 +541,18 @@ function renderSymbol(c: SchComponent, px: (g: number) => number, selected: bool
     )
   } else if (c.kind === 'opamp') {
     const xL = ax, yT = ay, yB = ay + G(2), xR = ax + G(4), yM = ay + G(1)
+    const xMid = ax + G(2)
     inner = (
       <g>
         <line x1={xL} y1={yT} x2={xL + 10} y2={yT} stroke={stroke} strokeWidth={sw} />
         <line x1={xL} y1={yB} x2={xL + 10} y2={yB} stroke={stroke} strokeWidth={sw} />
         <line x1={xR - 6} y1={yM} x2={xR} y2={yM} stroke={stroke} strokeWidth={sw} />
         <polygon points={`${xL + 10},${yT - 8} ${xL + 10},${yB + 8} ${xR - 6},${yM}`} fill="var(--bg-panel)" stroke={stroke} strokeWidth={sw} />
+        {/* V+ / V- power stubs (top/bottom) */}
+        <line x1={xMid} y1={ay - G(1)} x2={xMid} y2={ay + 2} stroke="#e04040" strokeWidth={sw} />
+        <line x1={xMid} y1={ay + G(3)} x2={xMid} y2={ay + G(2) - 2} stroke="#4a9eff" strokeWidth={sw} />
+        {upright(xMid + 9, ay - G(1) + 4, <text x={xMid + 9} y={ay - G(1) + 4} fill="#e04040" fontSize={9} textAnchor="middle">V+</text>)}
+        {upright(xMid + 9, ay + G(3), <text x={xMid + 9} y={ay + G(3)} fill="#4a9eff" fontSize={9} textAnchor="middle">V−</text>)}
         {upright(xL + 17, yT + 4, <text x={xL + 17} y={yT + 4} fill="var(--text-primary)" fontSize={11} textAnchor="middle">+</text>)}
         {upright(xL + 17, yB + 1, <text x={xL + 17} y={yB + 1} fill="var(--text-primary)" fontSize={13} textAnchor="middle">−</text>)}
         {upright(xL + 30, yM + 4, <text x={xL + 30} y={yM + 4} fill="var(--text-secondary)" fontSize={10} textAnchor="middle">{c.id}</text>)}
