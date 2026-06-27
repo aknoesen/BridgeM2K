@@ -206,3 +206,23 @@ describe('multi-ground + op-amp power pins (toCircuit)', () => {
     expect(op.nodes.vpos).not.toBe(op.nodes.vneg)
   })
 })
+
+describe('LMC662 dual DIP (toCircuit)', () => {
+  it('expands to two LMC662 sections sharing the V+/V- rails', () => {
+    const sch: Schematic = {
+      components: [
+        { id: 'U1', kind: 'lmc662', gx: 10, gy: 4 },
+        { id: 'G1', kind: 'ground', gx: 8, gy: 6 },
+      ],
+      wires: [{ x1: 10, y1: 6, x2: 8, y2: 6 }],
+    }
+    const d = toCircuit(sch, 'dip')
+    const ops = d.circuit.components.filter((c) => c.kind === 'opamp') as
+      Array<{ id: string; model?: string; nodes: { vpos?: string; vneg?: string } }>
+    expect(ops.length).toBe(2)
+    expect(ops.every((o) => o.model === 'lmc662')).toBe(true)
+    expect(ops[0].nodes.vpos).toBe(ops[1].nodes.vpos)
+    expect(ops[0].nodes.vneg).toBe(ops[1].nodes.vneg)
+    expect(ops[0].nodes.vpos).not.toBe(ops[0].nodes.vneg)
+  })
+})

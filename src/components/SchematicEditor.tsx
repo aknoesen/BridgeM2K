@@ -23,6 +23,7 @@ const TOOLS: { tool: Tool; label: string }[] = [
   { tool: 'capacitor', label: 'C' },
   { tool: 'inductor', label: 'L' },
   { tool: 'opamp', label: 'Op-amp' },
+  { tool: 'lmc662', label: 'LMC662' },
   { tool: 'inamp', label: 'INA' },
   { tool: 'inamp3', label: 'INA3' },
   { tool: 'awg1', label: 'W1' },
@@ -47,7 +48,7 @@ const DEFAULT_VALUE: Partial<Record<SchKind, number>> = {
 // The Ref field in the Selected panel lets the student override any id (must stay unique).
 const REFDES: Partial<Record<SchKind, string>> = {
   resistor: 'R', capacitor: 'C', inductor: 'L', vsource: 'V',
-  opamp: 'U', inamp: 'U', inamp3: 'U',
+  opamp: 'U', lmc662: 'U', inamp: 'U', inamp3: 'U',
 }
 function refPrefix(k: SchKind): string {
   return REFDES[k] ?? k[0].toUpperCase()
@@ -556,6 +557,33 @@ function renderSymbol(c: SchComponent, px: (g: number) => number, selected: bool
         {upright(xL + 17, yT + 4, <text x={xL + 17} y={yT + 4} fill="var(--text-primary)" fontSize={11} textAnchor="middle">+</text>)}
         {upright(xL + 17, yB + 1, <text x={xL + 17} y={yB + 1} fill="var(--text-primary)" fontSize={13} textAnchor="middle">−</text>)}
         {upright(xL + 30, yM + 4, <text x={xL + 30} y={yM + 4} fill="var(--text-secondary)" fontSize={10} textAnchor="middle">{c.id}</text>)}
+      </g>
+    )
+  } else if (c.kind === 'lmc662') {
+    // 8-pin DIP. Left pins 1-4 (OUTA,-A,+A,V-), right pins top→bottom (V+,OUTB,-B,+B).
+    const w = G(4)
+    const bx0 = ax + 12, bx1 = ax + w - 12, by0 = ay - 10, by1 = ay + G(3) + 10
+    const cxm = (bx0 + bx1) / 2
+    const lLab = ['OUTA', '−A', '+A', 'V−']
+    const rLab = ['V+', 'OUTB', '−B', '+B']
+    inner = (
+      <g>
+        <rect x={bx0} y={by0} width={bx1 - bx0} height={by1 - by0} rx={4} fill="var(--bg-panel)" stroke={stroke} strokeWidth={sw} />
+        <path d={`M ${cxm - 7},${by0} a 7 7 0 0 0 14 0`} fill="none" stroke={stroke} strokeWidth={sw} />
+        {[0, 1, 2, 3].map((i) => (
+          <g key={'l' + i}>
+            <line x1={ax} y1={ay + G(i)} x2={bx0} y2={ay + G(i)} stroke={stroke} strokeWidth={sw} />
+            {upright(bx0 + 13, ay + G(i) + 3, <text x={bx0 + 13} y={ay + G(i) + 3} fill="var(--text-secondary)" fontSize={8} textAnchor="start">{lLab[i]}</text>)}
+          </g>
+        ))}
+        {[0, 1, 2, 3].map((i) => (
+          <g key={'r' + i}>
+            <line x1={ax + w} y1={ay + G(i)} x2={bx1} y2={ay + G(i)} stroke={stroke} strokeWidth={sw} />
+            {upright(bx1 - 13, ay + G(i) + 3, <text x={bx1 - 13} y={ay + G(i) + 3} fill="var(--text-secondary)" fontSize={8} textAnchor="end">{rLab[i]}</text>)}
+          </g>
+        ))}
+        {upright(cxm, ay + G(1) + 2, <text x={cxm} y={ay + G(1) + 2} fill="var(--ch1-color)" fontSize={9} textAnchor="middle">{c.id}</text>)}
+        {upright(cxm, ay + G(2) + 2, <text x={cxm} y={ay + G(2) + 2} fill="var(--text-secondary)" fontSize={8} textAnchor="middle">LMC662</text>)}
       </g>
     )
   } else if (c.kind === 'ground') {

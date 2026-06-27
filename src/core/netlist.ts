@@ -237,10 +237,14 @@ function opampLines(c: OpAmp, n: (net: Net) => string): string[] {
   const o = `xop${c.id}_o`
   const clipHi = vpos ? `V(${vpos})` : fmt(c.supplyPos ?? 5)
   const clipLo = vneg ? `V(${vneg})` : fmt(c.supplyNeg ?? -5)
+  // 1 TΩ input bleeds: realistic CMOS input impedance, and they keep an UNUSED section's inputs
+  // (e.g. the spare half of a dual) from floating. Negligible against any real source/feedback.
   return [
     `Bg${c.id} 0 ${o} I = max(${(-imax).toExponential(6)}, min(${imax.toExponential(6)}, ${gm}*(V(${inP})-V(${inN}))))`,
     `Rp${c.id} ${o} 0 ${fmt(rp)}`,                        // DC gain leg (gm·Rp = Aol)
     `Cp${c.id} ${o} 0 ${fmt(cp)}`,                        // dominant pole + slew integrator
+    `Rip${c.id} ${inP} 0 1e12`,
+    `Rim${c.id} ${inN} 0 1e12`,
     ...bleed,
     `Bo${c.id} ${out} 0 V = max(${clipLo}, min(${clipHi}, V(${o})))`, // output clip to the rails
   ]

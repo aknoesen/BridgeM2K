@@ -10,6 +10,7 @@ export type SchKind =
   | 'inductor'
   | 'vsource' // generator input source; terminal 'a' = +, 'b' = -
   | 'opamp'
+  | 'lmc662' // LMC662 dual op-amp as an 8-pin DIP (two LMC662 sections + V+/V- rails)
   | 'inamp' // ideal instrumentation amp (single VCVS); pins inP/inN/out/ref
   | 'inamp3' // 3-op-amp instrumentation amp (teaches the internal topology)
   | 'ground'
@@ -71,6 +72,18 @@ export function baseTerminals(kind: SchKind): SchTerminal[] {
         { name: 'out', gx: 4, gy: 1 },
         { name: 'vpos', gx: 2, gy: -1 }, // V+ power pin (top)
         { name: 'vneg', gx: 2, gy: 3 },  // V- power pin (bottom)
+      ]
+    case 'lmc662':
+      // 8-pin DIP, real pinout. Left side pins 1-4 top→bottom, right side pins 5-8 bottom→top.
+      return [
+        { name: 'outA', gx: 0, gy: 0 },   // 1: OUT A
+        { name: 'inAneg', gx: 0, gy: 1 }, // 2: -IN A
+        { name: 'inApos', gx: 0, gy: 2 }, // 3: +IN A
+        { name: 'vneg', gx: 0, gy: 3 },   // 4: V-
+        { name: 'inBpos', gx: 4, gy: 3 }, // 5: +IN B
+        { name: 'inBneg', gx: 4, gy: 2 }, // 6: -IN B
+        { name: 'outB', gx: 4, gy: 1 },   // 7: OUT B
+        { name: 'vpos', gx: 4, gy: 0 },   // 8: V+
       ]
     case 'inamp':
     case 'inamp3':
@@ -304,6 +317,13 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
           vneg: rename(netOf(ts[4].gx, ts[4].gy)),
         },
       })
+    } else if (c.kind === 'lmc662') {
+      // Dual DIP → two LMC662 op-amp sections (A, B) sharing the V+/V- rail pins.
+      const net = (i: number) => rename(netOf(ts[i].gx, ts[i].gy))
+      const vpos = net(7), vneg = net(3) // pin 8 = V+, pin 4 = V-
+      const k = ec++
+      comps.push({ kind: 'opamp', id: `${k}A`, model: 'lmc662', nodes: { inP: net(2), inN: net(1), out: net(0), vpos, vneg } })
+      comps.push({ kind: 'opamp', id: `${k}B`, model: 'lmc662', nodes: { inP: net(4), inN: net(5), out: net(6), vpos, vneg } })
     } else if (c.kind === 'inamp' || c.kind === 'inamp3') {
       // Friendly default: if REF is left unwired (only the in-amp touches that net), tie it to
       // ground so a beginner circuit still solves instead of going singular.

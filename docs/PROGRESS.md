@@ -36,6 +36,39 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-26 — LMC662-DIP: dual op-amp as an 8-pin DIP (schematic side) — DONE
+
+**By:** Claude Code session (in Cowork)
+**Commit:** uncommitted (run `.\push.ps1`)
+
+**Why:** the LMC662 is a dual op-amp; andre wants it placed as the real 8-pin DIP (and used for the
+example: one section used, one spare).
+
+**What I did:**
+- `core/schematic.ts`: new `lmc662` SchKind — an 8-pin DIP with the real pinout (1 OUTA, 2 −INA,
+  3 +INA, 4 V−, 5 +INB, 6 −INB, 7 OUTB, 8 V+). `toCircuit` **expands it into two LMC662 op-amp
+  sections (A, B) that share the V+ (pin 8) and V− (pin 4) rail nets**.
+- `core/netlist.ts`: added 1 TΩ **input bleed** resistors to the LMC662 macromodel (realistic CMOS
+  input impedance) so an UNUSED section's inputs don't float — the spare half of the dual is fine
+  left unconnected.
+- `SchematicEditor.tsx`: **LMC662** palette button + a DIP symbol (body, pin-1 notch, 8 labelled
+  pins, refdes 'U').
+- `core/schematic.test.ts` (+1): the DIP expands to two `lmc662` sections sharing one V+ and one V− net.
+- Rebuilt `Mk2 Digital Twin/inverting-amp-LMC662.json` around the DIP: **section A** is the inverting
+  ×10 amp (powered ±5 V, 1− to GND), **section B left unused**. Validated from the file: no warnings,
+  two sections, ~20 dB inverting gain with the LMC662 rolloff.
+
+**Verification:** build clean; **72 passed (71 prior + 1 dual DIP)**; 12-bit floor holds.
+
+**State for the next session — remaining from andre's list:**
+- **Board DIP (F-3):** the breadboard still can't place the 8-pin DIP (only 2-pin parts). This is the
+  next piece — an IC footprint straddling the centre channel + checkEquivalence pin mapping.
+- **Flip/mirror** in the schematic (about the vertical axis) alongside Rotate — not started.
+- **Save with a directory/filename picker** (File System Access API + download fallback) — not started.
+- The single generic `opamp` (ideal/lmc662 model) still exists for teaching; the DIP is the faithful part.
+
+---
+
 ### 2026-06-26 — OPAMP-PWR: real V+/V− power pins (+ multi-ground fix) — DONE
 
 **By:** Claude Code session (in Cowork)
