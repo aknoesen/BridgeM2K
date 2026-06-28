@@ -356,7 +356,7 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
                         <circle cx={h.x} cy={h.y} r={3.2} fill={col} stroke="#000" strokeWidth={0.5}>
                           <title>{`pin ${i + 1}: ${LMC662_FN[i]}`}</title>
                         </circle>
-                        <text x={h.x} y={numY} fontSize={7.5} fontWeight={700} fill={numCol} textAnchor="middle">{i + 1}</text>
+                        <text x={h.x} y={numY} fontSize={9} fontWeight={800} fill={numCol} textAnchor="middle">{i + 1}</text>
                       </g>
                     )
                   })}
@@ -425,16 +425,39 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
         {exp.dips.length > 0 && (
           <>
             <div className="section-title">LMC662 pinout</div>
-            <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-              Pin 1 is at the notch (lower-left), numbered counter-clockwise. Hover a pin to see its name.
-              <div style={{ marginTop: 4, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px 10px' }}>
-                {LMC662_FN.map((fn, i) => (
-                  <span key={i} style={{ color: i === 7 ? '#e04040' : i === 3 ? '#4a9eff' : 'var(--text-secondary)' }}>
-                    <b>{i + 1}</b> {fn}
-                  </span>
-                ))}
-              </div>
-              <div style={{ marginTop: 4 }}>Your op-amp is section A: <b>+IN A</b> (3), <b>−IN A</b> (2), <b>OUT A</b> (1); power <b style={{ color: '#e04040' }}>V+</b> (8), <b style={{ color: '#4a9eff' }}>V−</b> (4).</div>
+            <svg viewBox="0 0 240 150" style={{ width: '100%', height: 'auto', maxWidth: 280 }} role="img" aria-label="LMC662 8-pin DIP pinout">
+              {/* top pins 8,7,6,5 (left→right); bottom pins 1,2,3,4 — matches the chip on the board */}
+              {([['V+', 8], ['OUT B', 7], ['−IN B', 6], ['+IN B', 5]] as const).map(([fn, p], j) => {
+                const x = 54 + j * 44
+                const c = p === 8 ? '#e04040' : '#cfcfcf'
+                return (
+                  <g key={p}>
+                    <line x1={x} y1={48} x2={x} y2={38} stroke="#888" strokeWidth={1.5} />
+                    <circle cx={x} cy={38} r={3} fill={c} />
+                    <text x={x} y={28} fontSize={11} fontWeight={800} fill={c} textAnchor="middle">{p}</text>
+                    <text x={x} y={17} fontSize={9} fill="var(--text-secondary)" textAnchor="middle">{fn}</text>
+                  </g>
+                )
+              })}
+              <rect x={36} y={48} width={168} height={54} rx={4} fill="#1b1b1f" stroke="#888" strokeWidth={1.5} />
+              <path d={`M ${36} ${68} a 7 7 0 0 0 0 14`} fill="#0c0d0f" stroke="#888" strokeWidth={1.5} />
+              <text x={120} y={79} fontSize={10} fill="#9aa0a6" textAnchor="middle">LMC662</text>
+              {([['OUT A', 1], ['−IN A', 2], ['+IN A', 3], ['V−', 4]] as const).map(([fn, p], j) => {
+                const x = 54 + j * 44
+                const c = p === 4 ? '#4a9eff' : '#cfcfcf'
+                return (
+                  <g key={p}>
+                    <line x1={x} y1={102} x2={x} y2={112} stroke="#888" strokeWidth={1.5} />
+                    <circle cx={x} cy={112} r={3} fill={c} />
+                    <text x={x} y={126} fontSize={11} fontWeight={800} fill={c} textAnchor="middle">{p}</text>
+                    <text x={x} y={138} fontSize={9} fill="var(--text-secondary)" textAnchor="middle">{fn}</text>
+                  </g>
+                )
+              })}
+            </svg>
+            <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6, marginTop: 2 }}>
+              Notch / pin 1 at the lower-left — same orientation as the chip on the board. Your op-amp uses
+              <b> section A</b>: +IN A (3), −IN A (2), OUT A (1); power <b style={{ color: '#e04040' }}>V+</b> (8) and <b style={{ color: '#4a9eff' }}>V−</b> (4).
             </div>
           </>
         )}
