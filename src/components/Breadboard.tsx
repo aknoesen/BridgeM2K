@@ -286,6 +286,10 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
               title={boardable ? 'Check board vs schematic' : 'This circuit has no breadboard footprint'} style={!boardable ? { opacity: 0.5 } : undefined}>✓ Check</button>
             <button className="run-btn" onClick={saveLab}>Save</button>
             <button className="run-btn" onClick={() => fileRef.current?.click()}>Open</button>
+            <button className="run-btn" title="Save the board layout as a PNG for your prelab"
+              onClick={() => { if (svgRef.current) exportSvgToPng(svgRef.current, 'breadboard.png', { light: true }).catch((e) => setCheck({ ok: false, message: `Export failed: ${e.message}` })) }}>
+              Export PNG
+            </button>
             <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={openLab} />
           </div>
         </div>
@@ -568,10 +572,6 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
           <button className={tool.kind === 'select' ? 'active' : ''} onClick={() => { setTool({ kind: 'select' }); setPending(null) }}>Select</button>
           <button className={tool.kind === 'jumper' ? 'active' : ''} onClick={() => { setTool({ kind: 'jumper' }); setPending(null) }}>Jumper</button>
           <button onClick={() => { setBoard({ parts: [], jumpers: [], ports: [], dips: [] }); setCheck(null); setPending(null) }}>Clear</button>
-          <button title="Save the board layout as a PNG (transparent background) for your prelab"
-            onClick={() => { if (svgRef.current) exportSvgToPng(svgRef.current, 'breadboard.png').catch((e) => setCheck({ ok: false, message: `Export failed: ${e.message}` })) }}>
-            Export PNG
-          </button>
         </div>
 
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 8, lineHeight: 1.6 }}>

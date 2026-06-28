@@ -46,11 +46,14 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
   inlines each element's *computed* paint (resolves the theme CSS variables to rgb; skips `url(...)`
   pattern/gradient refs so the grid-dot pattern still works), rasterizes at 2x on a canvas, downloads
   a **transparent** PNG. No dependencies; pure browser DOM/canvas.
-- "Export PNG" button per view: SchematicEditor header (→ `schematic.png`) and Breadboard Tools
-  (→ `breadboard.png`), each using the component's existing `svgRef`. Errors surface in that view's
-  status line.
-- Decisions (andre): PNG, transparent background, one button per view. Captures full board via its
-  viewBox; schematic via its rendered box (no viewBox).
+- "Export PNG" button per view, both in the **top header** (parallel): SchematicEditor header
+  (→ `schematic.png`) and Breadboard header next to Save/Open (→ `breadboard.png`), each using the
+  component's `svgRef`. Errors surface in that view's status line.
+- Decisions (andre): PNG, **white background with dark-ink remap** (`light: true`), one button per
+  view. `light` inverts each paint colour's HSL lightness (bg #0d0d0d→#f2f2f2, text #d4d4d4→#2b2b2b,
+  CH1 orange→darker orange, V+/V− red/blue→darker, etc.), drops the grid pattern, and fills the
+  canvas white — a clean paper figure for Gradescope/Word. Captures full board via its viewBox;
+  schematic via its rendered box (no viewBox).
 
 **Verification (Definition of Done):**
 - tsc --noEmit clean: yes

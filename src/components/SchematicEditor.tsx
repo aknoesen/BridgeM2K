@@ -505,7 +505,7 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
             <button className="run-btn" onClick={saveCircuit}>Save</button>
             <button className="run-btn" onClick={() => fileRef.current?.click()}>Open</button>
             <button className="run-btn" title="Save the schematic as a PNG (transparent background) for your prelab"
-              onClick={() => { if (svgRef.current) exportSvgToPng(svgRef.current, 'schematic.png').catch((e) => setSimStatus('Export failed: ' + e.message)) }}>
+              onClick={() => { if (svgRef.current) exportSvgToPng(svgRef.current, 'schematic.png', { light: true }).catch((e) => setSimStatus('Export failed: ' + e.message)) }}>
               Export PNG
             </button>
             <select className="run-btn" title="Load an example circuit" value=""
