@@ -221,6 +221,16 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
       <div className="display-area">
         <div className="display-header">
           <span className="display-title">Breadboard</span>
+          <div style={{ flex: 1, display: 'flex', gap: 14, alignItems: 'center', overflow: 'hidden', margin: '0 12px' }}>
+            {check && (
+              <span title={check.message} style={{ fontSize: 12, color: check.ok ? 'var(--theory-color)' : '#ffaa55', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{check.message}</span>
+            )}
+            {floatingMinus.length > 0 && (
+              <span title={floatingMinus.join('  ')} style={{ fontSize: 12, color: '#ffbf00', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                ⚠ {floatingMinus.length === 1 ? floatingMinus[0] : `${floatingMinus.length} − inputs floating — tie each to a node`}
+              </span>
+            )}
+          </div>
           <div className="display-controls">
             <button className={`run-btn ${mode === 'practice' ? 'active' : ''}`} onClick={() => { setMode('practice'); setRevealed(false) }}>Practice</button>
             <button className={`run-btn ${mode === 'bench' ? 'active' : ''}`} onClick={() => { setMode('bench'); setRevealed(false); setHoverNet(null) }}>Bench</button>
@@ -360,20 +370,6 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
             )}
           </svg>
         </div>
-        {check && (
-          <div className="marker-table">
-            <div className="marker-row">
-              <span style={{ fontSize: 12, color: check.ok ? 'var(--theory-color)' : '#ffaa55' }}>{check.message}</span>
-            </div>
-          </div>
-        )}
-        {floatingMinus.length > 0 && (
-          <div className="marker-table">
-            {floatingMinus.map((m, i) => (
-              <div className="marker-row" key={i}><span style={{ fontSize: 12, color: '#ffbf00' }}>⚠ {m}</span></div>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="settings-panel">
