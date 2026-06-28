@@ -21,6 +21,8 @@ type Tool =
   | { kind: 'placeDip'; id: string; partKind: SchKind }
 
 const NET_COLORS = ['#f0a030', '#40c0e0', '#44dd88', '#e06fd0', '#d0d040', '#7a8cff', '#ff8855', '#55ddcc']
+// LMC662 8-pin DIP function per pin (1..8), in dipPinHoles order. Pin 1 sits at the notch.
+const LMC662_FN = ['OUT A', '−IN A', '+IN A', 'V−', '+IN B', '−IN B', 'OUT B', 'V+']
 
 interface Props {
   schematic: Schematic
@@ -346,7 +348,17 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
                   {pins.map((k, i) => {
                     const h = pos(k); const net = nets.get(k)!
                     const col = (showNets && activeColor.get(net)) || '#cfcfcf'
-                    return <circle key={i} cx={h.x} cy={h.y} r={3.2} fill={col} stroke="#000" strokeWidth={0.5} />
+                    const isBottom = i < n           // pins 1..n on the bottom row, n+1..2n on top
+                    const numY = isBottom ? h.y + 12 : h.y - 7
+                    const numCol = i === 7 ? '#e04040' : i === 3 ? '#4a9eff' : '#9aa0a6' // V+ red, V− blue
+                    return (
+                      <g key={i}>
+                        <circle cx={h.x} cy={h.y} r={3.2} fill={col} stroke="#000" strokeWidth={0.5}>
+                          <title>{`pin ${i + 1}: ${LMC662_FN[i]}`}</title>
+                        </circle>
+                        <text x={h.x} y={numY} fontSize={7.5} fontWeight={700} fill={numCol} textAnchor="middle">{i + 1}</text>
+                      </g>
+                    )
                   })}
                   <text x={(bx + bx + bw) / 2} y={by + bh / 2 + 3} fontSize={8} fill="#cfcfcf" textAnchor="middle">{d.id} · LMC662</text>
                 </g>
@@ -408,6 +420,23 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
               </button>
             ))}
           </div>
+        )}
+
+        {exp.dips.length > 0 && (
+          <>
+            <div className="section-title">LMC662 pinout</div>
+            <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+              Pin 1 is at the notch (lower-left), numbered counter-clockwise. Hover a pin to see its name.
+              <div style={{ marginTop: 4, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px 10px' }}>
+                {LMC662_FN.map((fn, i) => (
+                  <span key={i} style={{ color: i === 7 ? '#e04040' : i === 3 ? '#4a9eff' : 'var(--text-secondary)' }}>
+                    <b>{i + 1}</b> {fn}
+                  </span>
+                ))}
+              </div>
+              <div style={{ marginTop: 4 }}>Your op-amp is section A: <b>+IN A</b> (3), <b>−IN A</b> (2), <b>OUT A</b> (1); power <b style={{ color: '#e04040' }}>V+</b> (8), <b style={{ color: '#4a9eff' }}>V−</b> (4).</div>
+            </div>
+          </>
         )}
 
         <div className="section-title">M2K terminals</div>
