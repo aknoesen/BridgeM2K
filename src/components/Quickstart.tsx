@@ -405,6 +405,49 @@ export default function Quickstart({ onGoTo, onLoadExample }: Props) {
             <span style={{ display: 'block', marginTop: 8 }}><button style={goBtn} onClick={() => onGoTo('spectrum')}>Open Spectrum Analyzer →</button></span>
           </p>
 
+          <h3 style={h3}>Next: the Curve Tracer — a transistor's whole family of curves</h3>
+          <p style={{ marginTop: 0 }}>
+            A transistor isn't one number, it's a <i>family</i> of output curves. The Curve Tracer sweeps
+            the drain/collector voltage and overlays one curve per gate/base step, so you read the device's
+            character at a glance: a MOSFET's triode-to-saturation <b>I<sub>d</sub> vs V<sub>ds</sub></b> at
+            each V<sub>gs</sub>, or a BJT's <b>I<sub>c</sub> vs V<sub>ce</sub></b> at each base step.
+          </p>
+          <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 8 }}>
+            Under the hood it's the real bench trick: <b>W1</b> ramps the drain/collector voltage, <b>W2</b>
+            sets a constant gate/base bias, and a <b>sense resistor</b> turns current into a voltage the ADC
+            can read (I = V<sub>sense</sub> / R<sub>sense</sub>). The real M2K traces one curve at a time; the
+            twin automates the stepped passes and draws the whole labelled family in one shot. Tune the
+            <b> sweep max</b>, <b>ramp</b>, and <b>step list</b> to spread or add curves.
+          </p>
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+              <span style={stepNum}>1</span>
+              <div style={{ flex: 1 }}>
+                <b>Load the MOSFET family.</b> The <b>ZVN2110A</b> NMOS swept at five gate steps. This loads
+                it and opens the Curve Tracer, where the family draws itself (auto-run).
+                <div style={{ marginTop: 8 }}><button style={goBtn} onClick={() => { onLoadExample('nmos-curve-family'); onGoTo('curvetracer') }}>Load MOSFET curve family → Curve Tracer →</button></div>
+              </div>
+            </div>
+          </div>
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+              <span style={stepNum}>2</span>
+              <div style={{ flex: 1 }}>
+                <b>Swap the device, retrace.</b> Load the <b>2N3904</b> NPN family and the same panel
+                redraws as <b>I<sub>c</sub> vs V<sub>ce</sub></b>. That's the real payoff: change the
+                transistor in any tracer circuit (W1 + W2 + sense resistor), retrace, and you immediately
+                see how <i>that</i> part behaves.
+                <div style={{ marginTop: 8 }}><button style={goBtn} onClick={() => { onLoadExample('bjt-curve-family'); onGoTo('curvetracer') }}>Load BJT curve family → Curve Tracer →</button></div>
+              </div>
+            </div>
+          </div>
+          <p style={{ fontSize: 12.5, color: '#ffbf00', marginTop: 10 }}>
+            Mind the example names: <b>"MOSFET curve family"</b> and <b>"BJT curve family"</b> drive the
+            Curve Tracer. The <b>"(XY)"</b> examples — "MOSFET output curve (XY)", "Diode I-V", "Zener I-V"
+            — are Oscilloscope XY-mode demos that draw a <i>single</i> curve the live bench way, not the
+            tracer. Same sense-resistor idea, different view.
+          </p>
+
           <h3 style={h3}>Next: from circuit &amp; simulation to the breadboard</h3>
           <p style={{ marginTop: 0 }}>
             Draw a circuit in the Circuit editor and the app simulates it (real ngspice), so every
