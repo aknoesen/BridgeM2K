@@ -56,14 +56,20 @@ src/
     trigger.ts                — edge/pulse/holdoff trigger engine
     netlist.ts                — Circuit graph → ngspice netlist (R/C/L, diode, op-amp, in-amp, …)
     spice.ts / spice.worker.ts— SpiceEngine adapter; ngspice WASM in a Web Worker
-    schematic.ts              — schematic model, terminals, computeNets, toCircuit, diode/amp helpers
-    breadboard.ts             — solderless-board model, nets, schematic-equivalence check, DIP geometry
+    schematic.ts              — schematic model, terminals, computeNets, toCircuit, diode/amp helpers;
+                                rubber-band move (moveComponentWithWires + bridgeWiresForMove: a
+                                touch-connection becomes a real wire when a part is dragged)
+    breadboard.ts             — solderless-board model, nets, schematic-equivalence check (incl.
+                                INA125 reference/sense/sleep straps), DIP geometry
     units.ts                  — value units + tune ranges (shared with Network Analyzer)
     examples.ts               — built-in example-circuit library (schematic + optional W1/scope preset)
   components/
     SignalGenerator.tsx  SpectrumAnalyzer.tsx  Oscilloscope.tsx  NetworkAnalyzer.tsx
     Voltmeter.tsx  PowerSupply.tsx  SchematicEditor.tsx  Breadboard.tsx
-    Welcome.tsx (landing)  About.tsx (credits)  Instrument.css (shared panel layout)
+    Quickstart.tsx (in-app onboarding doc)  Welcome.tsx (landing)  About.tsx (credits)
+    exportImage.ts            — PNG export: SVG (schematic/board, white paper figure) + Plotly
+                                instruments (dark), via the native Save dialog (savePngBlob)
+    Instrument.css (shared panel layout)
 docs/                         — CONVENTIONS.md, ROADMAP.md, PROGRESS.md, specs/*.md
 ```
 
