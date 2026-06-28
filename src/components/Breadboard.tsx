@@ -21,6 +21,10 @@ type Tool =
   | { kind: 'placeDip'; id: string; partKind: SchKind }
 
 const NET_COLORS = ['#f0a030', '#40c0e0', '#44dd88', '#e06fd0', '#d0d040', '#7a8cff', '#ff8855', '#55ddcc']
+// A ¼ W axial resistor's body is ~0.25"; with its leads bent down it spans about 5 holes (0.5") and
+// can be crammed to ~4 holes at the tightest. Enforce that floor so legs can't sit unrealistically
+// close (e.g. adjacent holes). Pitch is 0.1" per hole.
+const MIN_RESISTOR_HOLES = 4
 // DIP function per pin (1-based), in dipPinHoles order. Pin 1 sits at the notch.
 const LMC662_FN = ['OUT A', '−IN A', '+IN A', 'V−', '+IN B', '−IN B', 'OUT B', 'V+']
 const INA125_FN = ['V+', 'SLEEP', 'V−', 'VREFOUT', 'IAREF', 'VIN−', 'VIN+', 'RG', 'RG', 'VO', 'Sense', 'VREFCOM', 'VREFBG', 'VREF2.5', 'VREF5', 'VREF10']
@@ -89,11 +93,14 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
   }, [board, nets])
 
   const showNets = mode === 'practice' || revealed
-  // A jumper touching a terminal takes that terminal's convention colour; a plain hole-to-hole
-  // jumper keeps its node colour.
+  // Wire colouring follows the power convention: a jumper touching a terminal, OR sitting on the
+  // V+/V−/GND net (e.g. one daisy-chained off the rail), takes that supply's colour. Any other
+  // hole-to-hole jumper keeps its node colour.
   const wireColor = (ak: string, bk: string) => {
     const t = termByKey.get(ak) ?? termByKey.get(bk)
     if (t) return TERM_COLOR[t.color]
+    const sup = supplyOf(ak) ?? supplyOf(bk)
+    if (sup) return SUPPLY_LINE[sup]
     const jnet = nets.get(ak)
     return (showNets && jnet && activeColor.get(jnet)) || '#c9cdd2'
   }
@@ -140,6 +147,16 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
     if (tool.kind === 'placePart') {
       if (!pending) { setPending(key); return }
       if (pending === key) { setPending(null); return }
+      // A through-hole resistor's leads can't be crammed closer than its body allows. Keep the first
+      // leg pending so the student just clicks a hole farther out.
+      if (tool.partKind === 'resistor') {
+        const A = pos(pending), B = pos(key)
+        const span = Math.hypot(B.x - A.x, B.y - A.y) / PITCH
+        if (span < MIN_RESISTOR_HOLES) {
+          setCheck({ ok: false, message: `Too tight: a resistor's legs span ~5 holes (0.5"). Place them at least ${MIN_RESISTOR_HOLES} holes apart — pick a farther hole.` })
+          return
+        }
+      }
       const part = { id: tool.id, kind: tool.partKind, aHole: pending, bHole: key }
       setBoard((b) => ({ ...b, parts: [...b.parts.filter((p) => p.id !== tool.id), part] }))
       setPending(null); setTool({ kind: 'select' })
@@ -520,7 +537,7 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
               <b style={{ color: '#4a9eff' }}>V−</b> (3) to the rails.
             </div>
             <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6, marginTop: 4 }}>
-              <b style={{ color: 'var(--ch1-color)' }}>Required strapping</b> (the chip won't work without it — see Lab 8 Fig 1):
+              <b style={{ color: 'var(--ch1-color)' }}>Required strapping</b> (the chip won't work without it):
               <b> SLEEP</b> (2)→V+, <b>VREFout</b> (4)→<b>VREF2.5</b> (14), <b>IAref</b> (5)→GND,
               <b> Sense</b> (11)→<b>VO</b> (10), <b>VREFcom</b> (12)→GND. The board <b>Check</b> enforces each one.
             </div>

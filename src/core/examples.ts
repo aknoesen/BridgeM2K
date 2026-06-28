@@ -210,8 +210,8 @@ export const EXAMPLES: Example[] = [
     },
   },
   {
-    id: 'integrator', name: 'Integrator (op-amp)', group: 'Amplifiers',
-    blurb: 'Inverting integrator (Rf bounds DC gain, ~70 Hz corner). Drive well above the corner and a triangle integrates to a parabolic wave (CH2 in, CH1 out).',
+    id: 'integrator', name: 'Integrator (LMC662)', group: 'Amplifiers',
+    blurb: 'LMC662 op-amp on ±5 V rails. Inverting integrator (Rf bounds DC gain, ~70 Hz corner). Drive well above the corner and a triangle integrates to a parabolic wave (CH2 in, CH1 out). Buildable on the breadboard as an 8-pin DIP.',
     // Drive at 1 kHz, ~14× above the ~70 Hz corner, so it integrates cleanly: output extrema land on
     // the input zero-crossings. (τ = RfCf = 2.2 ms stays under the sim window, so it settles with no
     // offset drift.) CH1 = output (~0.5 Vpp, 100 mV/div), CH2 = input (4 Vpp, 1 V/div).
@@ -243,8 +243,8 @@ export const EXAMPLES: Example[] = [
     },
   },
   {
-    id: 'differentiator', name: 'Differentiator (op-amp)', group: 'Amplifiers',
-    blurb: 'Inverting differentiator. +20 dB/decade (0 dB near 160 Hz): a triangle differentiates to a square (CH2 in, CH1 out).',
+    id: 'differentiator', name: 'Differentiator (LMC662)', group: 'Amplifiers',
+    blurb: 'LMC662 op-amp on ±5 V rails. Inverting differentiator, +20 dB/decade (0 dB near 160 Hz): a triangle differentiates to a square (CH2 in, CH1 out). Buildable on the breadboard as an 8-pin DIP.',
     // Triangle in -> square out (derivative of constant slopes). With the real LMC662 the square has
     // some peaking at the corners (a practical differentiator), so the output runs a few volts.
     // CH1 = output (~±3 V, 1 V/div), CH2 = input (4 Vpp, 1 V/div).
@@ -273,8 +273,8 @@ export const EXAMPLES: Example[] = [
     },
   },
   {
-    id: 'summing', name: 'Summing amp (W1 + W2)', group: 'Amplifiers',
-    blurb: 'Inverting summer: out = −(W1 + W2). Both generators are preset (1 kHz + 2 kHz); the scope shows the composite sum, and you can see/edit W1 and W2 in the Signal Generator.',
+    id: 'summing', name: 'Summing amp (LMC662)', group: 'Amplifiers',
+    blurb: 'LMC662 op-amp on ±5 V rails. Inverting summer: out = −(W1 + W2). Both generators are preset (1 kHz + 2 kHz); the scope shows the composite sum, and you can see/edit W1 and W2 in the Signal Generator. Buildable on the breadboard as an 8-pin DIP.',
     w1: sine(1000), w2: sine(2000), ch1Vdiv: 0.5,
     schematic: {
       components: [

@@ -36,6 +36,34 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-27 — Polish: example naming, resistor lead spacing, supply-wire colour — DONE
+
+**By:** Cowork session (andre)
+**Commit:** uncommitted
+
+**What I did:**
+- `examples.ts`: made all op-amp examples name the chip consistently — integrator, differentiator,
+  and summing now read "(LMC662)" (were "(op-amp)" / unlabelled) with blurbs matching inv/noninv
+  ("LMC662 op-amp on ±5 V rails … 8-pin DIP"). They already used `kind: 'opamp'` (= LMC662).
+- `Breadboard.tsx`: resistor placement now enforces a minimum lead span. A ¼ W axial resistor spans
+  ~5 holes (0.5") and bends to ~4 at the tightest, so `MIN_RESISTOR_HOLES = 4`; placing the 2nd leg
+  closer than that is rejected with a hint and the 1st leg stays pending. Span = Euclidean hole
+  distance (handles channel-straddle and diagonals). Resistor-only (small film caps legitimately
+  span 2 holes).
+- `Breadboard.tsx`: `wireColor` now colours ANY jumper sitting on the V+/V−/GND net (via `supplyOf`),
+  not just ones with an endpoint on a fixed terminal — so a jumper daisy-chained off a rail shows the
+  rail's colour.
+
+**Verification (Definition of Done):**
+- tsc --noEmit clean: yes
+- 12-bit floor untouched (no core/signal.ts): yes
+
+**State for the next session:**
+- `MIN_RESISTOR_HOLES` is the single knob for the spacing floor (currently 4; bump to 5 for the strict
+  nominal). Rule is resistor-only; extend to other leaded parts by widening the `partKind` guard.
+
+---
+
 ### 2026-06-27 — SCH-7b INA125 auxiliary-pin straps (Lab 8 Fig 1) — DONE
 
 **By:** Cowork session (andre)
