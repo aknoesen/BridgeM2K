@@ -39,6 +39,7 @@ Spec: `docs/specs/schematic-ngspice.md`
 | LOOP-2 | Live value tuning + transient/AC toggle + −3 dB cursor | LOOP-1 | DONE |
 | SCH-5 | Amplifier model picker: sim-only (ideal, no rails) vs sim+build (LMC662, rails) via Selected-panel Type dropdown | SCH-1 | SUPERSEDED |
 | SCH-6 | Op-amp is LMC662-only (no package-less ideal): 3-pin schematic symbol, auto ±5 V in sim, boards as an 8-pin DIP whose V+/V− the Check requires on the rails. Replaces SCH-5's picker. | SCH-5, F-5 | DONE |
+| SCH-7 | INA125 instrumentation amp as the only in-amp (drop ideal/3-op-amp): structural model (external R_G sets G = 4 + 60 kΩ/R_G) + on-chip reference; 16-pin DIP on the board with pinout legend; rail-power Check. See `docs/specs/ina125.md`. | SCH-6, F-5 | TODO |
 | KICAD-1 | (Stretch) KiCad netlist import | LOOP-1 | TODO |
 
 Notes:
