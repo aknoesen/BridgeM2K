@@ -10,6 +10,7 @@ import { buildNetlist } from '../core/netlist'
 import { EXAMPLES } from '../core/examples'
 import { createSpiceEngine, type SpiceEngine, transferFunction } from '../core/spice'
 import { UNIT, TUNE_RANGE, fmtEng, parseEng, tunePos, tuneValue } from '../core/units'
+import { exportSvgToPng } from './exportImage'
 import './Instrument.css'
 
 const GRID = 24
@@ -503,6 +504,10 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
             <button className="run-btn" onClick={deleteSelected} disabled={!selected && selectedWire === null}>Delete</button>
             <button className="run-btn" onClick={saveCircuit}>Save</button>
             <button className="run-btn" onClick={() => fileRef.current?.click()}>Open</button>
+            <button className="run-btn" title="Save the schematic as a PNG (transparent background) for your prelab"
+              onClick={() => { if (svgRef.current) exportSvgToPng(svgRef.current, 'schematic.png').catch((e) => setSimStatus('Export failed: ' + e.message)) }}>
+              Export PNG
+            </button>
             <select className="run-btn" title="Load an example circuit" value=""
               onChange={(e) => {
                 const ex = EXAMPLES.find((x) => x.id === e.target.value)

@@ -11,6 +11,7 @@ import {
 } from '../core/breadboard'
 import { type Schematic, type SchKind } from '../core/schematic'
 import { type SignalParams } from '../core/signal'
+import { exportSvgToPng } from './exportImage'
 import './Instrument.css'
 
 type Mode = 'practice' | 'bench'
@@ -567,6 +568,10 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
           <button className={tool.kind === 'select' ? 'active' : ''} onClick={() => { setTool({ kind: 'select' }); setPending(null) }}>Select</button>
           <button className={tool.kind === 'jumper' ? 'active' : ''} onClick={() => { setTool({ kind: 'jumper' }); setPending(null) }}>Jumper</button>
           <button onClick={() => { setBoard({ parts: [], jumpers: [], ports: [], dips: [] }); setCheck(null); setPending(null) }}>Clear</button>
+          <button title="Save the board layout as a PNG (transparent background) for your prelab"
+            onClick={() => { if (svgRef.current) exportSvgToPng(svgRef.current, 'breadboard.png').catch((e) => setCheck({ ok: false, message: `Export failed: ${e.message}` })) }}>
+            Export PNG
+          </button>
         </div>
 
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 8, lineHeight: 1.6 }}>

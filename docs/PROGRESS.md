@@ -36,6 +36,34 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-27 — Prelab image export: schematic + board → PNG — DONE
+
+**By:** Cowork session (andre)
+**Commit:** uncommitted
+
+**What I did:**
+- New `src/components/exportImage.ts`: `exportSvgToPng(svg, filename, scale=2)`. Clones the live SVG,
+  inlines each element's *computed* paint (resolves the theme CSS variables to rgb; skips `url(...)`
+  pattern/gradient refs so the grid-dot pattern still works), rasterizes at 2x on a canvas, downloads
+  a **transparent** PNG. No dependencies; pure browser DOM/canvas.
+- "Export PNG" button per view: SchematicEditor header (→ `schematic.png`) and Breadboard Tools
+  (→ `breadboard.png`), each using the component's existing `svgRef`. Errors surface in that view's
+  status line.
+- Decisions (andre): PNG, transparent background, one button per view. Captures full board via its
+  viewBox; schematic via its rendered box (no viewBox).
+
+**Verification (Definition of Done):**
+- tsc --noEmit clean: yes
+- Canvas is untainted (these SVGs reference no external images), so `toDataURL` succeeds: yes
+- 12-bit floor untouched: yes (no core/signal.ts)
+
+**State for the next session:**
+- Single export util is reusable for any on-screen SVG (e.g. could add a scope/spectrum export later).
+- Transparent means dark-theme light strokes can wash out on a white page; if students report that,
+  flip the button to a dark or white baked background (one line: pre-fill the canvas before drawImage).
+
+---
+
 ### 2026-06-27 — Polish: example naming, resistor lead spacing, supply-wire colour — DONE
 
 **By:** Cowork session (andre)
