@@ -183,11 +183,11 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
     // files (just {components,wires}) still load fine.
     const json = JSON.stringify({ kind: 'm2k-circuit', version: 1, ...sch }, null, 2)
     const sfp = (window as unknown as {
-      showSavePicker?: (o: {
+      showSaveFilePicker?: (o: {
         suggestedName?: string
         types?: { description?: string; accept: Record<string, string[]> }[]
       }) => Promise<{ name: string; createWritable: () => Promise<{ write: (d: string) => Promise<void>; close: () => Promise<void> }> }>
-    }).showSavePicker
+    }).showSaveFilePicker
     if (typeof sfp === 'function') {
       try {
         const handle = await sfp({

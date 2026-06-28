@@ -196,11 +196,11 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
   async function saveLab() {
     const json = JSON.stringify({ kind: 'm2k-lab', version: 2, schematic, board, generators }, null, 2)
     const sfp = (window as unknown as {
-      showSavePicker?: (o: {
+      showSaveFilePicker?: (o: {
         suggestedName?: string
         types?: { description?: string; accept: Record<string, string[]> }[]
       }) => Promise<{ name: string; createWritable: () => Promise<{ write: (d: string) => Promise<void>; close: () => Promise<void> }> }>
-    }).showSavePicker
+    }).showSaveFilePicker
     if (typeof sfp === 'function') {
       try {
         const handle = await sfp({
