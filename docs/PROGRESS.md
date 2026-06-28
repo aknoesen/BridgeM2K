@@ -36,6 +36,34 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-27 — Quickstart QS-3: "Draw your first circuit (supply rails)" — DONE
+
+**By:** Cowork session (andre, for the EEC1 lab rewrite)
+**Commit:** uncommitted
+
+**What I did:** added an 8-step *draw-from-scratch* guided sequence to `Quickstart.tsx`, placed after
+the single-ended/differential section and before the divider walkthrough. It walks: open editor →
+place V+/V−/GND → place 1±/2± → wire single-ended (junction dots confirm) → set Power Supply → read
+Voltmeter → rewire 1− to V− for differential → Export PNG. Anchor `id="draw-first-circuit"` added.
+
+**Verification gate (the lab agent asked):**
+- A bare rails+probes circuit (V+, V−, GND, four probe markers, **no load resistor**) was simulated
+  via toCircuit → applySupplyRails → buildNetlist(`.op`) → ngspice. It **solves cleanly**: single-ended
+  reads Ch1=+5, Ch2=−5; differential reads Ch1=+10 (V+−V−), Ch2=−5. The dcrail sources to ground
+  define every node, so **no floating-node/singular-matrix issue and no bleeder resistor is needed.**
+- Voltmeter Export PNG already prints title + per-channel labels — no change needed (confirmed).
+
+**Correction vs the spec the agent sent:** step 7 ("make CH1 differential") cannot be a literal
+"drag the 1− probe onto V−" — with auto-wire rubber-banding, the probe's wire to GND follows it and
+would short GND to V−. The correct (and bench-accurate) move is delete the 1−→GND wire, then wire
+1−→V−. The step is written that way.
+
+**Notes:** kept the in-app copy general (no "Lab 1"/figure numbers) per the standing instruction; the
+lab doc can point at it via the anchor or "open Quickstart → Draw your first circuit". tsc clean; no
+core/signal.ts touched.
+
+---
+
 ### 2026-06-27 — Export PNG on every instrument (gen/scope/spectrum/network/voltmeter) — DONE
 
 **By:** Cowork session (andre)

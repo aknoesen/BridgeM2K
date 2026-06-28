@@ -139,6 +139,119 @@ export default function Quickstart({ onGoTo, onLoadExample }: Props) {
             to your <b>reference node</b> for a differential one.
           </p>
 
+          <h3 id="draw-first-circuit" style={h3}>Draw your first circuit: the M2K supply rails</h3>
+          <p style={{ marginTop: 0 }}>
+            Now build one yourself instead of loading it. You'll draw the M2K's two supply rails and
+            measure them on the Voltmeter — single-ended first, then differential. The wiring you do
+            here is the same wiring you'll repeat on the real bench, so this is the part worth
+            practising: placing parts and connecting them, not just pressing a button.
+          </p>
+
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+              <span style={stepNum}>1</span>
+              <div style={{ flex: 1 }}>
+                <b>Open the Circuit editor.</b> You get an empty canvas. Along the top is a tool for
+                each part you can place, plus <b>Select</b> (to pick up and move things) and <b>Wire</b>
+                (to connect them).
+                <div style={{ marginTop: 8 }}><button style={goBtn} onClick={() => onGoTo('schematic')}>Open Circuit editor →</button></div>
+              </div>
+            </div>
+          </div>
+
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+              <span style={stepNum}>2</span>
+              <div style={{ flex: 1 }}>
+                <b>Place the supply ports.</b> Click the <b style={{ color: '#e04040' }}>V+</b> tool,
+                then click the canvas to drop it. Do the same for <b style={{ color: '#4a9eff' }}>V−</b>
+                and <b>GND</b>. These are the M2K's power-supply rails and its ground.
+              </div>
+            </div>
+          </div>
+
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+              <span style={stepNum}>3</span>
+              <div style={{ flex: 1 }}>
+                <b>Place the four probe ports.</b> Drop <b style={{ color: 'var(--ch1-color)' }}>1+</b>,
+                <b style={{ color: '#40c0e0' }}> 1−</b>, <b style={{ color: 'var(--ch1-color)' }}>2+</b>,
+                <b style={{ color: '#40c0e0' }}> 2−</b> — each is one half of a voltmeter channel.
+              </div>
+            </div>
+          </div>
+
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+              <span style={stepNum}>4</span>
+              <div style={{ flex: 1 }}>
+                <b>Wire it (single-ended).</b> Pick the <b>Wire</b> tool and connect{' '}
+                <b style={{ color: 'var(--ch1-color)' }}>1+</b> → the <b style={{ color: '#e04040' }}>V+</b> node,
+                <b style={{ color: '#40c0e0' }}> 1−</b> → <b>GND</b>,
+                <b style={{ color: 'var(--ch1-color)' }}> 2+</b> → the <b style={{ color: '#4a9eff' }}>V−</b> node,
+                and <b style={{ color: '#40c0e0' }}>2−</b> → <b>GND</b>. A <b>junction dot</b> appears at
+                each connection — that's your confirmation the wire took.
+              </div>
+            </div>
+          </div>
+
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+              <span style={stepNum}>5</span>
+              <div style={{ flex: 1 }}>
+                <b>Set the supply.</b> Open the Power Supply (independent mode) and set
+                <b style={{ color: '#e04040' }}> V+</b> and <b style={{ color: '#4a9eff' }}>V−</b> to the
+                values you want — say +5 V and −5 V.
+                <div style={{ marginTop: 8 }}><button style={goBtn} onClick={() => onGoTo('psu')}>Open Power Supply →</button></div>
+              </div>
+            </div>
+          </div>
+
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+              <span style={stepNum}>6</span>
+              <div style={{ flex: 1 }}>
+                <b>Read it.</b> Open the Voltmeter and press Measure. <b>Channel 1</b> = V(1+) − V(1−) =
+                V+; <b>Channel 2</b> = V−. Both are single-ended, because each <b>−</b> input sits on
+                ground.
+                <div style={{ marginTop: 8 }}><button style={goBtn} onClick={() => onGoTo('voltmeter')}>Open Voltmeter →</button></div>
+              </div>
+            </div>
+          </div>
+
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+              <span style={stepNum}>7</span>
+              <div style={{ flex: 1 }}>
+                <b>Make Channel 1 differential.</b> Move the <b style={{ color: '#40c0e0' }}>1−</b> input
+                off ground and onto the <b style={{ color: '#4a9eff' }}>V−</b> node: with <b>Select</b>,
+                click its wire to <b>GND</b> and delete it, then use <b>Wire</b> to connect
+                <b style={{ color: '#40c0e0' }}> 1−</b> straight to <b style={{ color: '#4a9eff' }}>V−</b>.
+                Measure again — Channel 1 now reads <b>V+ − V−</b> (the full ±span), while Channel 2 still
+                reads V− alone. This is the identical lead move you'll make on the real M2K.
+                <div style={{ marginTop: 8 }}><button style={goBtn} onClick={() => onGoTo('schematic')}>Back to Circuit editor →</button></div>
+              </div>
+            </div>
+          </div>
+
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+              <span style={stepNum}>8</span>
+              <div style={{ flex: 1 }}>
+                <b>Save it for your records.</b> In the Voltmeter, press <b>Export PNG</b> to save the
+                readings (title and per-channel labels are included). Annotate your name on top, the same
+                way you would a bench screenshot, and submit it.
+                <div style={{ marginTop: 8 }}><button style={goBtn} onClick={() => onGoTo('voltmeter')}>Open Voltmeter →</button></div>
+              </div>
+            </div>
+          </div>
+
+          <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 12 }}>
+            That's the whole loop: place parts, wire them, power them, measure, then change the wiring to
+            change the measurement. Everything below loads ready-made circuits, but you now know how to
+            build your own.
+          </p>
+
           <h3 style={h3}>Your first measurement — a voltage divider</h3>
           <p style={{ marginTop: 0 }}>
             Pair the <b>Power Supply</b> with the <b>Voltmeter</b>: set a DC voltage, then read it. We
