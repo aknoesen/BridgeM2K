@@ -874,7 +874,7 @@ function renderSymbol(c: SchComponent, px: (g: number) => number, selected: bool
         {upright(ax + G(3), yM + 3, <text x={ax + G(3)} y={yM + 3} fill="var(--text-secondary)" fontSize={8} textAnchor="middle">INA125</text>)}
         {upright(ax + G(2), yBot + 9, <text x={ax + G(2)} y={yBot + 9} fill="var(--text-secondary)" fontSize={7} textAnchor="middle">RG</text>)}
         {upright(ax + G(4), yBot + 9, <text x={ax + G(4)} y={yBot + 9} fill="var(--text-secondary)" fontSize={7} textAnchor="middle">RG</text>)}
-        {upright(ax + G(3), yBot + 9, <text x={ax + G(3)} y={yBot + 9} fill="var(--text-secondary)" fontSize={7} textAnchor="middle">REF</text>)}
+        {upright(ax + G(3), yBot + 18, <text x={ax + G(3)} y={yBot + 18} fill="var(--text-secondary)" fontSize={7} textAnchor="middle">IAREF→GND</text>)}
         {upright(ax + G(3), yT - 14, <text x={ax + G(3)} y={yT - 14} fill="var(--text-secondary)" fontSize={10} textAnchor="middle">{c.id}</text>)}
       </g>
     )
