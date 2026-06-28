@@ -10,12 +10,16 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Next session: start here (updated 2026-06-28)
 
-**SCH-8 (transistor parts) is DONE.** The final slice — the `Breadboard.tsx` TO-92 render +
-drag-placement UI — is in, so transistors now go schematic → board → Check end to end. **SWEEP-1**
-(the hardware-faithful curve tracer) is the next phase; spec at `docs/specs/sch8-sweep1.md`. Still
-pending (a SWEEP-1 concern, noted by the prior SCH-8 entry): tune the level-1 MOSFET `KP` and the
-`nmos-output-xy` example operating point — the devices currently run hard-on, so the seed curve looks
-flat. Full detail in the top log entry below.
+**SWEEP-1 (hardware-faithful curve tracer) is DONE.** A new **Curve Tracer** instrument
+(`components/CurveTracer.tsx` + `core/curvetracer.ts`) traces BJT/MOSFET output-characteristic
+families by N stepped `.tran` passes (W1 sweeps Vds/Vce, W2 steps Vgs / Vbb→Ib, current via a sense
+resistor) — no `.dc`, no new ngspice element. Two examples (`nmos-curve-family`, `bjt-curve-family`)
+load and auto-open the tracer. The level-1 MOSFET `KP` was tuned (criterion 5) for a clean family.
+Both **SCH-8 and SWEEP-1 are complete**, closing the transistor/curve-tracer pair. Natural
+follow-ons (ROADMAP): **SCH-9** (kit op-amp library) and **SCH-10** (passives as kit values), both
+breadth phases. The optional SWEEP-1 W2-staircase / single-acquisition mode was **not** built (the N
+stepped passes route fully satisfies the spec); it remains an optional enhancement. Full detail in
+the top log entry below.
 
 ---
 
@@ -46,6 +50,69 @@ flat. Full detail in the top log entry below.
 ---
 
 ## Log
+
+### 2026-06-28 — SWEEP-1 parametric curve tracer (W1 sweep + W2 step + scope XY) — DONE
+
+**By:** Claude Code session
+**Commit:** uncommitted
+
+**What I did:**
+- `core/curvetracer.ts` (new, pure/testable): `identifyTracer` (finds the BJT/MOSFET + W1 + W2 +
+  emitter/source sense resistor in a `Circuit`), `buildTracerCircuit` (one stepped pass — W1 → a
+  triangle ramp over the swept range, W2 → a constant DC step), `tracerAnalysis` (the `.tran`
+  directive), and `extractCurve` (Vds/Vce = V(high)−V(sense); current = V(sense)/Rsense — the diode
+  I-V sense-resistor trick). Runs entirely on the EXISTING `.tran` path; the `Analysis` union and
+  `netlist.ts` analysis directives are unchanged (no `.dc`, no new element).
+- `components/CurveTracer.tsx` (new instrument): own SPICE worker (mirrors NetworkAnalyzer), runs N
+  stepped passes, overlays the labelled family with Plotly (dark theme, `displayModeBar:false`,
+  `Plotly.react`), debounced auto-run; settings = Vds/Vce max, ramp time, and the step list
+  (start/increment/count). Reads the active `drawn.circuit`; shows a "draw a transistor stage" hint
+  when the circuit isn't traceable.
+- `App.tsx`: nav button + `renderPanel` case `'curvetracer'`; examples with `tracer:true` open it
+  (both the Quickstart `loadExample` path and the Circuit editor dropdown via a new `onOpenTracer`
+  prop on `SchematicEditor`).
+- `core/examples.ts`: `nmos-curve-family` (ZVN2110A, W2→gate, 10 Ω sense) and `bjt-curve-family`
+  (2N3904, W2→100 kΩ base resistor→base, 100 Ω emitter sense) — both `tracer:true`. Added the
+  `tracer?` field; re-framed `nmos-output-xy` Volts/div for the retuned model.
+- `core/netlist.ts` (criterion 5): tuned the level-1 MOSFET kit cards — `ZVN2110A`/`ZVN3310A`/
+  `ZVP2110A` from `KP=0.15/0.05` to **`KP=0.005 LAMBDA=0.02`**. KP=0.15 ran the device hard-on (drain
+  to ~0, flat curves); KP≈5 mA/V² gives a textbook triode→saturation family at M2K scales. (Note:
+  netlist.ts isn't in the SWEEP-1 allowed-files list, but criterion 5 explicitly mandates this model
+  tuning and the user authorized it; only the model param strings changed — no analysis/element
+  changes, so the "directives unchanged" constraint holds.)
+- `core/curvetracer.test.ts` (new, 5 tests): identify MOSFET + BJT setups, assert W1=PULSE/W2=bare-DC
+  in the built netlist, and an end-to-end engine run proving the MOSFET family is separated, rises
+  with Vgs, and saturates.
+
+**How the model was tuned:** ran the real `eecircuit-engine` headless in Node (the same engine the
+tests use) to sweep KP and pick the value giving a clean, well-separated family at ±5 V / few-mA with
+visible knees. Verified the exact `.tran` path (incl. the 49.9 Ω AWG output impedance + triangle
+ramp) reproduces it before committing.
+
+**Verification (Definition of Done):**
+- build clean: YES — `npm run build` (`tsc && vite build`) clean.
+- tests: `npm test -- --run` → **100 passed** (8 files; +5 new curve-tracer tests).
+- live app (dev server + Chrome): loaded **MOSFET curve family** → Curve Tracer auto-opened and drew
+  5 separated Id-vs-Vds curves (Vgs 2…4 V), triode→saturation, Y-axis 0–15.7 mA, **no console
+  errors**; **BJT curve family** drew "NPN Ic-vs-Vce", 5 curves (Vbb 1…3 V), Ic≤2.79 mA.
+- 12-bit canary: confirmed in the running Spectrum Analyzer — floor line at **−104.29 dBFS**, SNR ≈
+  74 dB (12-bit), clean odd harmonics with no inter-harmonic leakage. `core/signal.ts` and the FFT
+  path were not touched.
+
+**State for the next session:**
+- The Curve Tracer primitive (W1 sweep + W2 step + scope-XY-via-Rsense on the `.tran` path) is also
+  the M1K/ALICE curve-tracer primitive, so it is groundwork for a future device twin.
+- The optional bench-literal **W2-staircase / single-acquisition** mode (spec §"Engine path", option
+  2) was deliberately not built — the N stepped-pass route meets every acceptance item. If wanted, it
+  needs a staircase waveform on W2 + XY persistence.
+- Model fidelity: the kit MOSFET cards are level-1 approximations tuned for clean teaching curves, not
+  datasheet-exact; swap in manufacturer cards if higher fidelity is ever needed. BJT (2N3904) cards
+  were already clean — only the MOSFETs were retuned.
+
+**Open questions / flags for andre:**
+- Curve Tracer identifies the device/sense-R/W1/W2 from the drawn circuit by topology (transistor +
+  a resistor from source/emitter to ground + sources W1/W2). It works for the shipped examples and
+  any circuit following that pattern; an unusual sense placement would read as "not traceable."
 
 ### 2026-06-28 — SCH-8 transistor parts — Breadboard TO-92 UI — DONE (SCH-8 complete)
 

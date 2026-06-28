@@ -8,6 +8,7 @@ import SignalGenerator from './components/SignalGenerator'
 import SpectrumAnalyzer from './components/SpectrumAnalyzer'
 import Oscilloscope from './components/Oscilloscope'
 import NetworkAnalyzer from './components/NetworkAnalyzer'
+import CurveTracer from './components/CurveTracer'
 import SchematicEditor from './components/SchematicEditor'
 import Breadboard from './components/Breadboard'
 import About from './components/About'
@@ -19,7 +20,7 @@ import Voltmeter from './components/Voltmeter'
 import PowerSupply from './components/PowerSupply'
 import './App.css'
 
-type ActiveInstrument = 'siggen' | 'spectrum' | 'scope' | 'network' | 'schematic' | 'voltmeter' | 'psu' | 'breadboard' | 'about' | 'quickstart'
+type ActiveInstrument = 'siggen' | 'spectrum' | 'scope' | 'network' | 'curvetracer' | 'schematic' | 'voltmeter' | 'psu' | 'breadboard' | 'about' | 'quickstart'
 
 // E-1: preset lab layouts. A workspace is an ordered list of instrument panels plus an
 // arrangement hint; CSS grid/flex in `.instrument-area` lays them out. Single-instrument view is
@@ -369,6 +370,7 @@ export default function App() {
     setParams({ ...DEFAULT_PARAMS, ...ex.w1 })
     setParams2({ ...DEFAULT_PARAMS2, ...ex.w2 })
     setScopeReq({ xy: !!ex.xy, ch1Vdiv: ex.ch1Vdiv, ch2Vdiv: ex.ch2Vdiv })
+    if (ex.tracer) { setActive('curvetracer'); setPresetId(null) }
   }
 
   // One instrument panel by id. `multi` (more than one visible) drives the `compact` prop on the
@@ -385,14 +387,14 @@ export default function App() {
         return <SchematicEditor schematic={schematic} setSchematic={setSchematic}
           snapshot={snapshotSchematic} undo={undoSchematic} redo={redoSchematic}
           onLoadGenerators={(w1, w2) => { if (w1) setParams({ ...DEFAULT_PARAMS, ...w1 }); setParams2(w2 ? { ...DEFAULT_PARAMS2, ...w2 } : DEFAULT_PARAMS2) }}
-          onLoadScope={(req) => setScopeReq(req)} />
+          onLoadScope={(req) => setScopeReq(req)} onOpenTracer={() => { setActive('curvetracer'); setPresetId(null) }} />
       case 'breadboard':
         return (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', minHeight: 0 }}>
             <div className="stacked-pane"><SchematicEditor schematic={schematic} setSchematic={setSchematic}
               snapshot={snapshotSchematic} undo={undoSchematic} redo={redoSchematic}
               onLoadGenerators={(w1, w2) => { if (w1) setParams({ ...DEFAULT_PARAMS, ...w1 }); setParams2(w2 ? { ...DEFAULT_PARAMS2, ...w2 } : DEFAULT_PARAMS2) }}
-          onLoadScope={(req) => setScopeReq(req)} /></div>
+          onLoadScope={(req) => setScopeReq(req)} onOpenTracer={() => { setActive('curvetracer'); setPresetId(null) }} /></div>
             <div className="stacked-pane"><Breadboard schematic={schematic} setSchematic={setSchematic} board={board} setBoard={setBoard}
               snapshotSchematic={snapshotSchematic}
               generators={{ w1: params, w2: params2 }}
@@ -402,6 +404,9 @@ export default function App() {
       case 'network':
         return <NetworkAnalyzer circuit={drawnValid ? drawn.circuit : undefined} dutName={drawnValid ? 'your drawn circuit' : undefined}
           probes={drawnValid ? drawn.probes : undefined} tunables={tunables} onTune={tuneComponent} />
+      case 'curvetracer':
+        return <CurveTracer circuit={drawnValid ? drawn.circuit : undefined}
+          dutName={drawnValid ? 'your drawn circuit' : undefined} compact={multi} />
       case 'voltmeter':
         return <Voltmeter circuit={drawn.circuit} probes={drawn.probes} w1={params} w2={params2} psu={psu} />
       case 'psu':
@@ -439,6 +444,7 @@ export default function App() {
         {navBtn('scope', '∿', 'Scope', 'Oscilloscope')}
         {navBtn('spectrum', '▲', 'Spectrum', 'Spectrum Analyzer')}
         {navBtn('network', '◎', 'Network', 'Network Analyzer (Bode)')}
+        {navBtn('curvetracer', '⌥', <>Curve<br/>Tracer</>, 'Curve Tracer (transistor characteristics)')}
         {navBtn('voltmeter', 'Ω', 'Voltmeter', 'Voltmeter (DC)')}
         {navBtn('psu', '∓', 'Supply', 'Power Supply')}
         {navBtn('schematic', '▤', 'Circuit', 'Schematic Editor')}

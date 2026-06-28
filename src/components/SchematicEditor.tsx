@@ -85,9 +85,11 @@ interface EditorProps {
   onLoadGenerators?: (w1?: import('../core/signal').SignalParams, w2?: import('../core/signal').SignalParams) => void
   // Request the scope setup an example wants on load (XY mode + optional Volts/div framing).
   onLoadScope?: (req: { xy: boolean; ch1Vdiv?: number; ch2Vdiv?: number }) => void
+  // Open the Curve Tracer when an example requests it (SWEEP-1 curve-family examples).
+  onOpenTracer?: () => void
 }
 
-export default function SchematicEditor({ schematic, setSchematic, snapshot, undo, redo, onLoadGenerators, onLoadScope }: EditorProps) {
+export default function SchematicEditor({ schematic, setSchematic, snapshot, undo, redo, onLoadGenerators, onLoadScope, onOpenTracer }: EditorProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const sch = schematic
@@ -533,6 +535,7 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
                   setTool('select'); setWireStart(null)
                   if (ex.w1 || ex.w2) onLoadGenerators?.(ex.w1, ex.w2)
                   onLoadScope?.({ xy: !!ex.xy, ch1Vdiv: ex.ch1Vdiv, ch2Vdiv: ex.ch2Vdiv })
+                  if (ex.tracer) onOpenTracer?.()
                   setSimStatus('loaded example: ' + ex.name)
                 }
               }}>

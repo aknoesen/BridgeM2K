@@ -24,6 +24,9 @@ export interface Example {
   // Optional scope mode applied on load: xy:true puts the oscilloscope in XY mode (I-V curves);
   // omitted/false loads in normal time (YT) mode.
   xy?: boolean
+  // Optional: open the Curve Tracer (SWEEP-1) on load instead of the scope — a transistor
+  // characteristic-curve family (W1 sweeps Vds/Vce, W2 steps the control, scope XY via Rsense).
+  tracer?: boolean
   // Optional scope Volts/div presets so an example frames its curve without manual scaling
   // (must be one of the scope's steps: 0.05, 0.1, 0.2, 0.5, 1, 2, 5).
   ch1Vdiv?: number
@@ -386,9 +389,9 @@ export const EXAMPLES: Example[] = [
   },
   {
     id: 'nmos-output-xy', name: 'MOSFET output curve (XY)', group: 'Amplifiers',
-    blurb: 'A ZVN2110A NMOS with the gate held at V+ (on). W1 sweeps the drain; in XY mode CH1 (X) ≈ Vds, CH2 (Y) = drain current (I·Rsense). This is one Vgs output characteristic — the SWEEP-1 curve tracer steps W2 on the gate to draw the whole family. Model params are level-1 approximations; tune on a host sim if the curve runs off-scale.',
+    blurb: 'A ZVN2110A NMOS with the gate held at V+ (on). W1 sweeps the drain; in XY mode CH1 (X) ≈ Vds, CH2 (Y) = drain current (I·Rsense). This is one Vgs output characteristic — load "MOSFET curve family" to let the SWEEP-1 Curve Tracer step W2 on the gate and draw the whole family.',
     w1: { waveType: 'triangle', frequency: 200, amplitude: 2.5, offset: 2.5, dutyCycle: 50, samplingRate: 100000, duration: 0.016 },
-    xy: true, ch1Vdiv: 0.5, ch2Vdiv: 0.5,
+    xy: true, ch1Vdiv: 1, ch2Vdiv: 0.5,
     schematic: {
       components: [
         { id: 'W1', kind: 'awg1', gx: 10, gy: 4 },
@@ -405,6 +408,59 @@ export const EXAMPLES: Example[] = [
         { x1: 8, y1: 4, x2: 8, y2: 2 },   // drain -> 1+
         { x1: 8, y1: 8, x2: 8, y2: 10 },  // sense R -> ground
         { x1: 8, y1: 6, x2: 10, y2: 6 },  // source node -> 2+
+      ],
+    },
+  },
+  {
+    id: 'nmos-curve-family', name: 'MOSFET curve family (ZVN2110A)', group: 'Amplifiers',
+    blurb: 'The full output-characteristic family on the Curve Tracer (SWEEP-1). W1 sweeps the drain (Vds); W2 steps the gate (Vgs) over several values; the device current is read across the 10 Ω sense resistor. Press ▶ Run family to trace Id-vs-Vds for each Vgs — the hardware-faithful M2K curve-tracer procedure (W1 sweep + W2 step + scope XY).',
+    // W1 = a Vds ramp; W2 = a steady gate level for the background sim (the Curve Tracer overrides
+    // both per step). Opens the Curve Tracer instrument on load.
+    w1: { waveType: 'triangle', frequency: 200, amplitude: 2.5, offset: 2.5, dutyCycle: 50, samplingRate: 100000, duration: 0.016 },
+    w2: { waveType: 'sine', frequency: 1000, amplitude: 0, offset: 3, dutyCycle: 50, samplingRate: 100000, duration: 0.016 },
+    tracer: true, xy: true, ch1Vdiv: 1, ch2Vdiv: 0.2,
+    schematic: {
+      components: [
+        { id: 'W1', kind: 'awg1', gx: 10, gy: 4 },
+        { id: 'M1', kind: 'mosfet', gx: 6, gy: 4, part: 'ZVN2110A' }, // drain (8,4) gate (6,5) source (8,6)
+        { id: 'W2', kind: 'awg2', gx: 4, gy: 5 },                      // -> gate (steps Vgs)
+        { id: 'R1', kind: 'resistor', gx: 8, gy: 6, rotation: 1, value: 10 }, // sense R, source -> gnd
+        { id: 'G1', kind: 'ground', gx: 8, gy: 10 },
+        { id: 'S1', kind: 'scope1', gx: 8, gy: 2 },  // 1+ on the drain (X ≈ Vds)
+        { id: 'S2', kind: 'scope2', gx: 10, gy: 6 }, // 2+ on the source node (Id·Rsense)
+      ],
+      wires: [
+        { x1: 8, y1: 4, x2: 10, y2: 4 },  // drain -> W1 (Vds sweep)
+        { x1: 4, y1: 5, x2: 6, y2: 5 },   // W2 -> gate (Vgs step)
+        { x1: 8, y1: 4, x2: 8, y2: 2 },   // drain -> 1+
+        { x1: 8, y1: 8, x2: 8, y2: 10 },  // sense R -> ground
+        { x1: 8, y1: 6, x2: 10, y2: 6 },  // source node -> 2+
+      ],
+    },
+  },
+  {
+    id: 'bjt-curve-family', name: 'BJT curve family (2N3904)', group: 'Amplifiers',
+    blurb: 'NPN output characteristics on the Curve Tracer (SWEEP-1). W1 sweeps the collector (Vce); W2 steps the base voltage, which sets the base current Ib through the 100 kΩ base resistor (Ib ≈ (V(W2)−Vbe)/Rb) — the hardware-faithful way to step Ib with no current source. Collector current is read across the 100 Ω emitter sense resistor. Press ▶ Run family.',
+    w1: { waveType: 'triangle', frequency: 200, amplitude: 2.5, offset: 2.5, dutyCycle: 50, samplingRate: 100000, duration: 0.016 },
+    w2: { waveType: 'sine', frequency: 1000, amplitude: 0, offset: 2, dutyCycle: 50, samplingRate: 100000, duration: 0.016 },
+    tracer: true, xy: true, ch1Vdiv: 1, ch2Vdiv: 0.2,
+    schematic: {
+      components: [
+        { id: 'W1', kind: 'awg1', gx: 10, gy: 4 },
+        { id: 'Q1', kind: 'bjt', gx: 6, gy: 4, part: '2N3904' }, // collector (8,4) base (6,5) emitter (8,6)
+        { id: 'W2', kind: 'awg2', gx: 2, gy: 5 },                 // -> Rb -> base (steps Ib)
+        { id: 'Rb', kind: 'resistor', gx: 4, gy: 5, value: 100000 }, // base resistor, a (4,5) b (6,5)
+        { id: 'R1', kind: 'resistor', gx: 8, gy: 6, rotation: 1, value: 100 }, // emitter sense R -> gnd
+        { id: 'G1', kind: 'ground', gx: 8, gy: 10 },
+        { id: 'S1', kind: 'scope1', gx: 8, gy: 2 },  // 1+ on the collector (X ≈ Vce)
+        { id: 'S2', kind: 'scope2', gx: 10, gy: 6 }, // 2+ on the emitter node (Ic·Rsense)
+      ],
+      wires: [
+        { x1: 8, y1: 4, x2: 10, y2: 4 },  // collector -> W1 (Vce sweep)
+        { x1: 2, y1: 5, x2: 4, y2: 5 },   // W2 -> Rb.a (Rb.b at (6,5) coincides with the base)
+        { x1: 8, y1: 4, x2: 8, y2: 2 },   // collector -> 1+
+        { x1: 8, y1: 8, x2: 8, y2: 10 },  // emitter sense R -> ground
+        { x1: 8, y1: 6, x2: 10, y2: 6 },  // emitter node -> 2+
       ],
     },
   },

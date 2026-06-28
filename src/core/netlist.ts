@@ -178,9 +178,13 @@ export const TRANSISTOR_PARTS: Record<string, TransistorPart> = {
   '2N3904': { type: 'npn', model: 'IS=6.734f BF=300 NF=1 VAF=74 IKF=66.78m ISE=6.734f NE=1.259 BR=0.7371 RC=1 CJC=3.638p CJE=4.493p TF=301.2p TR=239.5n' },
   '2N3903': { type: 'npn', model: 'IS=6.734f BF=200 NF=1 VAF=74 IKF=66.78m ISE=6.734f NE=1.259 BR=0.7371' },
   '2N3906': { type: 'pnp', model: 'IS=1.41f BF=180 NF=1 VAF=18.7 IKF=80m ISE=0 NE=1.5 BR=4.977 RC=2.5 CJC=9.728p CJE=8.063p TF=179.3p TR=33.42n' },
-  'ZVN2110A': { type: 'nmos', model: 'VTO=1.5 KP=0.15 LAMBDA=0.01' },
-  'ZVN3310A': { type: 'nmos', model: 'VTO=2 KP=0.15 LAMBDA=0.01' },
-  'ZVP2110A': { type: 'pmos', model: 'VTO=-1.5 KP=0.05 LAMBDA=0.01' },
+  // Level-1 KP/LAMBDA tuned (SWEEP-1, acceptance criterion 5) so a stepped family renders a clean,
+  // well-separated triode→saturation set at M2K scales (±5 V, a few mA): KP=0.15 ran the device
+  // hard-on (drain pulled to ~0, flat curves). KP≈5 mA/V², LAMBDA=0.02 gives a textbook output
+  // characteristic on the .tran curve-tracer path. Validated against the live tracer (see PROGRESS).
+  'ZVN2110A': { type: 'nmos', model: 'VTO=1.5 KP=0.005 LAMBDA=0.02' },
+  'ZVN3310A': { type: 'nmos', model: 'VTO=2 KP=0.005 LAMBDA=0.02' },
+  'ZVP2110A': { type: 'pmos', model: 'VTO=-1.5 KP=0.005 LAMBDA=0.02' },
 }
 
 // Generic fallback bodies when a part is unknown or unset (keeps an unspecified device simulating).

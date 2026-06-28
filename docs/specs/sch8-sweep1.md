@@ -191,7 +191,15 @@ Forbidden: `src/core/signal.ts` and the signal/FFT pipeline.
    no-current-source approach, or is documented as a fast follow-on if time runs out.
 4. One example loads and runs with a single button press; the workflow matches a procedure runnable on a
    real M2K (W1 sweep, W2 step, scope XY, sense resistor).
-5. `tsc` clean, no console errors, 12-bit floor still at −104 dBFS.
+5. **Model fidelity (inherited tuning item from SCH-8) — in scope here, not optional.** The transistor
+   models must render a *clean characteristic family* at M2K scales (±5 V, ~mA), not a degenerate set.
+   SCH-8 shipped level-1 MOSFET approximations that run hard-on (the drain pulls to ~0, which flattens
+   the curves). Tune them as part of SWEEP-1: adjust the level-1 `KP`/`VTO` (or swap in the
+   manufacturer device model) so the stepped family shows distinct, separated triode→saturation curves,
+   judged against the live Curve Tracer output. Re-verify the `nmos-output-xy` example reads sensibly
+   after tuning. This is the right place for it because curve quality can only be judged once the tracer
+   exists.
+6. `tsc` clean, no console errors, 12-bit floor still at −104 dBFS.
 
 ---
 
