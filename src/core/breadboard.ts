@@ -126,8 +126,16 @@ export const PORT_NAME: Partial<Record<SchKind, string>> = {
   awg1: 'W1', awg2: 'W2', scope1: '1+', adc1n: '1-', scope2: '2+', adc2n: '2-',
   vplus: 'V+', vminus: 'V-', ground: 'GND',
 }
-// 2-pin parts a student places on the board (F-2). DIP parts (op-amp/in-amp) are F-3.
-export const PLACEABLE_KINDS = new Set<SchKind>(['resistor', 'capacitor', 'inductor'])
+// 2-pin parts a student places on the board (F-2): passives plus the 2-terminal semiconductors.
+export const PLACEABLE_KINDS = new Set<SchKind>(['resistor', 'capacitor', 'inductor', 'diode', 'led', 'zener'])
+
+// Kinds the board cannot lay out yet (multi-pin actives with no board footprint): the in-amps.
+// (Op-amps now board as an LMC662 DIP.) A circuit with any of these can't be transferred, so the
+// Board view says so rather than silently dropping them.
+export const UNBOARDABLE_KINDS = new Set<SchKind>(['inamp', 'inamp3'])
+export function unboardable(s: Schematic): { id: string; kind: SchKind }[] {
+  return s.components.filter((c) => UNBOARDABLE_KINDS.has(c.kind)).map((c) => ({ id: c.id, kind: c.kind }))
+}
 
 // ── F-5: fixed M2K connector strips (always present) ─────────────────────────────
 // Mirrors the UC Davis adaptor board's two 1×15 headers: the M2K signals come out on fixed
@@ -236,7 +244,9 @@ export const emptyBoard = (): BoardLayout => ({ parts: [], jumpers: [], ports: [
 // What the schematic expects on the board: its R/C/L parts (with each leg's net) and its ports.
 export interface SchematicExpectation {
   parts: { id: string; kind: SchKind; a: string; b: string }[]
-  dips: { id: string; kind: SchKind; pinNets: string[] }[]
+  // pinNets is indexed by DIP pin (pin1 = index 0). `undefined` = an unused pin (no constraint).
+  // needsRails: the part is powered, so the Check also requires its V+/V- pins on the supply rails.
+  dips: { id: string; kind: SchKind; pinNets: (string | undefined)[]; needsRails?: boolean }[]
   ports: { name: string; net: string }[]
 }
 export function schematicExpectation(s: Schematic): SchematicExpectation {
@@ -251,6 +261,13 @@ export function schematicExpectation(s: Schematic): SchematicExpectation {
       parts.push({ id: c.id, kind: c.kind, a: netOf(ts[0].gx, ts[0].gy), b: netOf(ts[1].gx, ts[1].gy) })
     } else if (DIP_KINDS.has(c.kind)) {
       dips.push({ id: c.id, kind: c.kind, pinNets: ts.map((t) => netOf(t.gx, t.gy)) })
+    } else if (c.kind === 'opamp') {
+      // One LMC662 section on the schematic → an 8-pin DIP on the board. Map its signal pins to the
+      // DIP pinout (1=OUTA,2=-A,3=+A,8=V+,4=V-); pins 5-7 (section B) are unused; V+/V- come via the
+      // rails (needsRails), not the schematic.
+      const byName = new Map(ts.map((t) => [t.name, netOf(t.gx, t.gy)]))
+      const pinNets = [byName.get('out'), byName.get('inN'), byName.get('inP'), undefined, undefined, undefined, undefined, undefined]
+      dips.push({ id: c.id, kind: 'lmc662', pinNets, needsRails: true })
     } else {
       const name = PORT_NAME[c.kind]
       if (name && !ports.has(name)) ports.set(name, netOf(ts[0].gx, ts[0].gy))
@@ -297,9 +314,15 @@ export function checkEquivalence(s: Schematic, board: BoardLayout, holes: Hole[]
     const pl = placedDip.get(d.id)!
     const holesForDip = dipPinHoles(d.kind, pl.col) ?? []
     d.pinNets.forEach((net, k) => {
+      if (net === undefined) return // unused pin — no constraint
       schem.set(`${d.id}.p${k + 1}`, net)
       brd.set(`${d.id}.p${k + 1}`, bn(holesForDip[k] ?? `?${d.id}.${k}`))
     })
+    // A powered part must have its supply pins on the rails (LMC662: pin 8 = V+, pin 4 = V−).
+    if (d.needsRails) {
+      if (bn(holesForDip[7] ?? '?') !== bn(PORT_TERMINAL['V+'])) return { ok: false, message: `Wire ${d.id} pin 8 (V+) to the V+ rail.` }
+      if (bn(holesForDip[3] ?? '?') !== bn(PORT_TERMINAL['V-'])) return { ok: false, message: `Wire ${d.id} pin 4 (V−) to the V− rail.` }
+    }
   }
   for (const p of exp.ports) {
     schem.set(p.name, p.net); brd.set(p.name, bn(PORT_TERMINAL[p.name] ?? `?${p.name}`))

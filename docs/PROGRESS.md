@@ -36,6 +36,45 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Log
 
+### 2026-06-27 — SCH-6 op-amp is LMC662-only + boardable DIP — DONE
+
+**By:** Cowork session (andre)
+**Commit:** uncommitted
+
+**What I did:**
+- Removed the package-less "ideal" op-amp. The op-amp is always a real LMC662: `schematic.ts`
+  baseTerminals('opamp') is 3-pin (inP/inN/out, power implied); toCircuit emits model 'lmc662';
+  ampCategory('opamp')='build'. `opModel` field is now vestigial.
+- Editor (`SchematicEditor.tsx`): dropped the op-amp model picker (toolbar sub-selector + Selected
+  panel select + `setSelModel` + `opampType`); op-amp symbol no longer draws conditional rail stubs.
+  Also replaced the redundant R/C/L type letter with the component value (10kΩ, 0.1µF, 10mH).
+- Board (`core/breadboard.ts`): a schematic op-amp now maps to an 8-pin LMC662 DIP —
+  schematicExpectation emits a dip (pinNets index = DIP pin; section-A signal pins constrained, B
+  pins `undefined`, `needsRails:true`); checkEquivalence skips undefined pins and requires pin 8→V+
+  rail and pin 4→V− rail. Op-amp removed from UNBOARDABLE (in-amps still unboardable). Diode/LED/
+  Zener added to PLACEABLE_KINDS.
+- Examples: collapsed the four amp examples to two LMC662 ones (`inv-amp`, `noninv-amp`);
+  integrator/differentiator/summing unchanged (op-amp auto-powers). Differentiator reframed to
+  1 V/div (the real LMC662 differentiator peaks at the corners → ~±3 V).
+- Updated unit tests + CLAUDE.md; ROADMAP SCH-5 → SUPERSEDED, SCH-6 added.
+
+**Verification (Definition of Done):**
+- build clean: `tsc --noEmit` clean (Vite needs local `npm run build` — sandbox can't run rolldown).
+- 12-bit floor: untouched (no `core/signal.ts` change).
+- sim sanity: inv −2.2 (inverted), noninv ×2 (in-phase), integrator integrates, differentiator
+  square w/ peaking ±3 V, summing ±1.75 V — none clip ±5 V; all boardable. Board Check enforces
+  the DIP's V+/V− on the rails ("Wire U1 pin 8 (V+) to the V+ rail").
+
+**State for the next session:**
+- `opModel` is vestigial; could be removed from the type later. In-amps remain sim-only/unboardable.
+- The 'lmc662' schematic KIND (dual 8-pin) is no longer placeable from the toolbar (op-amp covers it).
+
+**Open questions / flags for andre:**
+- Confirm `npm run build` (Vite) clean locally. The differentiator now shows realistic op-amp peaking;
+  if you want it cleaner, add a small series input resistor (practical differentiator).
+
+---
+
 ### 2026-06-27 — F-5 fixed M2K connector strips on the breadboard — DONE
 
 **By:** Cowork session (andre)

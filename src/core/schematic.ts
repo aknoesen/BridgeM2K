@@ -78,18 +78,15 @@ export function baseTerminals(kind: SchKind, opModel?: 'ideal' | 'lmc662'): SchT
         { name: 'a', gx: 0, gy: 0 }, // anode (triangle side)
         { name: 'c', gx: 2, gy: 0 }, // cathode (bar side)
       ]
-    case 'opamp': {
-      const pins: SchTerminal[] = [
+    case 'opamp':
+      // The op-amp is always a real LMC662 (no package-less "ideal" variant). Its schematic symbol
+      // shows the signal pins only (power implied, ±5 V in sim); the full 8-pin DIP with V+/V- pins
+      // appears on the breadboard, where the student wires the supplies.
+      return [
         { name: 'inP', gx: 0, gy: 0 },
         { name: 'inN', gx: 0, gy: 2 },
         { name: 'out', gx: 4, gy: 1 },
       ]
-      if (opModel === 'lmc662') {
-        pins.push({ name: 'vpos', gx: 2, gy: -1 }) // V+ power pin (top)
-        pins.push({ name: 'vneg', gx: 2, gy: 3 })  // V- power pin (bottom)
-      }
-      return pins
-    }
     case 'lmc662':
       // 8-pin DIP, real pinout. Left side pins 1-4 top→bottom, right side pins 5-8 bottom→top.
       return [
@@ -149,7 +146,7 @@ export function terminalsOf(c: SchComponent): SchTerminal[] {
 // Returns null for parts that are not amplifiers. Single source of truth for the editor badge.
 export function ampCategory(c: SchComponent): 'sim' | 'build' | null {
   switch (c.kind) {
-    case 'opamp': return c.opModel === 'lmc662' ? 'build' : 'sim'
+    case 'opamp': return 'build'
     case 'lmc662': return 'build'
     case 'inamp':
     case 'inamp3': return 'sim'
@@ -401,12 +398,12 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
       comps.push({ kind: 'resistor', id: `aout${aw}`, nodes: [srcNet, outNet], ohms: 49.9 })
       aw++
     } else if (c.kind === 'opamp') {
-      // Ideal op-amp has only inP/inN/out (ts[3]/ts[4] absent). LMC662 adds the rail pins.
+      // Every op-amp is an LMC662 (one section) with V+/V- rail pins (ts[3]/ts[4]).
       const tvpos = ts[3], tvneg = ts[4]
       comps.push({
         kind: 'opamp',
         id: String(ec++),
-        model: c.opModel ?? 'ideal',
+        model: 'lmc662',
         nodes: {
           inP: rename(netOf(ts[0].gx, ts[0].gy)),
           inN: rename(netOf(ts[1].gx, ts[1].gy)),

@@ -229,8 +229,11 @@ deployment. Asset paths break if this is removed.
 The oscilloscope (incl. XY mode), the schematic editor + NGSpice-WASM simulation, the
 generator → circuit → scope/Bode loop, the breadboard transfer/verify, and the example
 library are all implemented — closing the original "Signal Generator → circuit → Spectrum/
-Scope" goal. Diodes/LED/Zener, the op-amp model picker, differential probes, undo/redo,
-copy/paste, and preset layouts are in. `docs/ROADMAP.md` is the phase-by-phase status of record.
+Scope" goal. Diodes/LED/Zener, differential probes, undo/redo, copy/paste, and preset layouts
+are in. The op-amp is always a real **LMC662** (no package-less "ideal" variant): its schematic
+symbol shows inP/inN/out with power implied (auto ±5 V in sim), and on the breadboard it is an
+8-pin DIP whose V+/V− must be wired to the rails (the board Check enforces this). Every part the
+twin offers is buildable; `docs/ROADMAP.md` is the phase-by-phase status of record.
 
 ## Remaining / future ideas
 

@@ -7,7 +7,7 @@ import {
   buildHoles, boardNets, boardWidth, boardHeight, PAD, PITCH, CHANNEL_SLOT,
   schematicExpectation, checkEquivalence, type BoardLayout, type CheckResult,
   dipPinHoles, dipCols, holeKey, DIP_TOP_ROW, DIP_BOT_ROW,
-  TERMINALS, type Terminal, POWER_WIRES, PORT_TERMINAL,
+  TERMINALS, type Terminal, POWER_WIRES, PORT_TERMINAL, unboardable,
 } from '../core/breadboard'
 import { type Schematic, type SchKind } from '../core/schematic'
 import { type SignalParams } from '../core/signal'
@@ -54,6 +54,8 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
   const STRIP = 48                 // height of each fixed M2K terminal strip
   const OY = STRIP                 // board content shifts down to leave room for the top strip
   const H2 = STRIP + H + STRIP     // total SVG height (top strip + board + bottom strip)
+  const RM = 42                    // right margin so the rail labels (GND/V+/V−) are not clipped
+  const W2 = W + RM                // total SVG width
   const railY = (slot: number) => PAD + slot * PITCH + OY
   const termByKey = useMemo(() => new Map(TERMINALS.map((t) => [t.key, t])), [])
   const termX = (t: Terminal) => PAD + (t.col - 1) * PITCH
@@ -90,6 +92,9 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
   }
   const placedPart = new Map(board.parts.map((p) => [p.id, p]))
   const placedDip = new Map((board.dips ?? []).map((d) => [d.id, d]))
+  // Components with no board footprint (op-amps/in-amps) → this circuit can't be transferred.
+  const blockers = useMemo(() => unboardable(schematic), [schematic])
+  const boardable = blockers.length === 0
 
   // Non-blocking nudge: if a + input is wired into the circuit but its − partner is left floating,
   // remind the student to tie it (GND for single-ended, the reference node for differential). The
@@ -135,7 +140,7 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
     }
   }
 
-  function runCheck() { setCheck(checkEquivalence(schematic, board, holes)); if (mode === 'bench') setRevealed(true) }
+  function runCheck() { if (!boardable) return; setCheck(checkEquivalence(schematic, board, holes)); if (mode === 'bench') setRevealed(true) }
 
   // Track the pointer in SVG coordinates while a jumper is in progress, for the rubber-band preview.
   function onSvgMove(e: React.MouseEvent<SVGSVGElement>) {
@@ -222,10 +227,16 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
         <div className="display-header">
           <span className="display-title">Breadboard</span>
           <div style={{ flex: 1, display: 'flex', gap: 14, alignItems: 'center', overflow: 'hidden', margin: '0 12px' }}>
-            {check && (
+            {!boardable && (
+              <span title={`These parts have no breadboard footprint: ${blockers.map((b) => `${b.id} (${b.kind})`).join(', ')}`}
+                style={{ fontSize: 12, color: '#ff7a7a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                ⛔ Can't build on a board: {blockers.map((b) => b.id).join(', ')} ({blockers[0].kind}) has no footprint yet.
+              </span>
+            )}
+            {boardable && check && (
               <span title={check.message} style={{ fontSize: 12, color: check.ok ? 'var(--theory-color)' : '#ffaa55', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{check.message}</span>
             )}
-            {floatingMinus.length > 0 && (
+            {boardable && floatingMinus.length > 0 && (
               <span title={floatingMinus.join('  ')} style={{ fontSize: 12, color: '#ffbf00', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 ⚠ {floatingMinus.length === 1 ? floatingMinus[0] : `${floatingMinus.length} − inputs floating — tie each to a node`}
               </span>
@@ -234,14 +245,15 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
           <div className="display-controls">
             <button className={`run-btn ${mode === 'practice' ? 'active' : ''}`} onClick={() => { setMode('practice'); setRevealed(false) }}>Practice</button>
             <button className={`run-btn ${mode === 'bench' ? 'active' : ''}`} onClick={() => { setMode('bench'); setRevealed(false); setHoverNet(null) }}>Bench</button>
-            <button className="run-btn active" onClick={runCheck}>✓ Check</button>
+            <button className={`run-btn ${boardable ? 'active' : ''}`} onClick={runCheck} disabled={!boardable}
+              title={boardable ? 'Check board vs schematic' : 'This circuit has no breadboard footprint'} style={!boardable ? { opacity: 0.5 } : undefined}>✓ Check</button>
             <button className="run-btn" onClick={saveLab}>Save</button>
             <button className="run-btn" onClick={() => fileRef.current?.click()}>Open</button>
             <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={openLab} />
           </div>
         </div>
         <div className="plotly-display" style={{ overflow: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 8 }}>
-          <svg ref={svgRef} viewBox={`0 0 ${W} ${H2}`} width={W} height={H2} style={{ maxWidth: '100%', height: 'auto' }}
+          <svg ref={svgRef} viewBox={`0 0 ${W2} ${H2}`} width={W2} height={H2} style={{ maxWidth: '100%', height: 'auto' }}
             onMouseMove={onSvgMove} onMouseLeave={() => cursor && setCursor(null)}>
             {/* fixed M2K adaptor-board connector strips, top & bottom */}
             <rect x={2} y={2} width={W - 4} height={STRIP - 8} rx={5} fill="#0f2c49" stroke="#1d4d7a" />
@@ -254,7 +266,7 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
             ))}
             {/* function label on each rail (outer = GND, top inner = V+, bottom inner = V−) */}
             {([[0, 'GND', 'gnd'], [1, 'V+', 'pos'], [15, 'V−', 'neg'], [16, 'GND', 'gnd']] as const).map(([s, lbl, c]) => (
-              <text key={'rl' + s} x={W - PAD + 14} y={railY(s) + 3} fontSize={9} fontWeight={700}
+              <text key={'rl' + s} x={W - PAD + 12} y={railY(s) + 4} fontSize={13} fontWeight={800}
                 fill={TERM_COLOR[c]} textAnchor="start">{lbl}</text>
             ))}
             <rect x={2} y={railY(CHANNEL_SLOT) - PITCH / 2} width={W - 4} height={PITCH} fill="#0d0d0d" />
@@ -374,6 +386,11 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
 
       <div className="settings-panel">
         <div className="section-title">Place from schematic</div>
+        {!boardable && (
+          <div style={{ fontSize: 11, color: '#ff7a7a', lineHeight: 1.5, marginBottom: 6 }}>
+            This circuit can't be transferred to a breadboard: {blockers.map((b) => `${b.id} (${b.kind})`).join(', ')} {blockers.length === 1 ? 'has' : 'have'} no board footprint yet. The breadboard currently supports passive and 2-terminal parts; op-amp / in-amp boarding is still to come.
+          </div>
+        )}
         {exp.parts.length === 0 && exp.dips.length === 0 ? (
           <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Draw a circuit in the Circuit tab above.</div>
         ) : (

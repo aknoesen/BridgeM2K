@@ -187,49 +187,39 @@ describe('AWG output impedance (49.9 Ohm, R132)', () => {
   }, 30000)
 })
 
-describe('multi-ground + op-amp power pins (toCircuit)', () => {
-  it('every ground symbol normalises to 0; op-amp exposes V+/V- nets', () => {
+describe('multi-ground (toCircuit)', () => {
+  it('every ground symbol normalises to 0', () => {
     const sch: Schematic = {
       components: [
-        { id: 'U1', kind: 'opamp', gx: 6, gy: 2, opModel: 'lmc662' }, // inP(6,2) inN(6,4) out(10,3) vpos(8,1) vneg(8,5)
+        { id: 'U1', kind: 'opamp', gx: 6, gy: 2 }, // inP(6,2) inN(6,4) out(10,3)
         { id: 'G1', kind: 'ground', gx: 4, gy: 2 }, // wired to inP
         { id: 'G2', kind: 'ground', gx: 8, gy: 9 }, // a SECOND, separate ground
       ],
       wires: [{ x1: 6, y1: 2, x2: 4, y2: 2 }], // inP -> G1
     }
     const d = toCircuit(sch, 't')
-    const op = d.circuit.components.find((c) => c.kind === 'opamp') as
-      { nodes: { inP: string; vpos?: string; vneg?: string } }
+    const op = d.circuit.components.find((c) => c.kind === 'opamp') as { nodes: { inP: string } }
     expect(op.nodes.inP).toBe('0') // grounded via G1 even though G2 is the last ground seen
-    expect(op.nodes.vpos).toBeTruthy()
-    expect(op.nodes.vneg).toBeTruthy()
-    expect(op.nodes.vpos).not.toBe(op.nodes.vneg)
   })
 })
 
-describe('amplifier model picker (SCH-5)', () => {
-  it('ideal op-amp exposes only inP/inN/out (no rail pins)', () => {
-    const ideal = terminalsOf({ id: 'U1', kind: 'opamp', gx: 0, gy: 0 }) // opModel undefined → ideal
-    expect(ideal.map((t) => t.name).sort()).toEqual(['inN', 'inP', 'out'])
+describe('op-amp is always a packaged LMC662', () => {
+  it('op-amp schematic symbol exposes only inP/inN/out (power implied)', () => {
+    const op = terminalsOf({ id: 'U1', kind: 'opamp', gx: 0, gy: 0 })
+    expect(op.map((t) => t.name).sort()).toEqual(['inN', 'inP', 'out'])
   })
 
-  it('LMC662 op-amp adds the V+/V- rail pins', () => {
-    const real = terminalsOf({ id: 'U1', kind: 'opamp', gx: 0, gy: 0, opModel: 'lmc662' })
-    expect(real.map((t) => t.name).sort()).toEqual(['inN', 'inP', 'out', 'vneg', 'vpos'])
-  })
-
-  it('ideal op-amp netlist has no vpos/vneg nodes', () => {
+  it('op-amp netlist is the LMC662 model, auto-powered (no wired rails)', () => {
     const sch: Schematic = { components: [{ id: 'U1', kind: 'opamp', gx: 6, gy: 2 }], wires: [] }
     const op = toCircuit(sch, 't').circuit.components.find((c) => c.kind === 'opamp') as
       { model?: string; nodes: { vpos?: string; vneg?: string } }
-    expect(op.model).toBe('ideal')
+    expect(op.model).toBe('lmc662')
     expect(op.nodes.vpos).toBeUndefined()
     expect(op.nodes.vneg).toBeUndefined()
   })
 
-  it('categorises sim-only vs sim+build parts', () => {
-    expect(ampCategory({ id: 'a', kind: 'opamp', gx: 0, gy: 0 })).toBe('sim')
-    expect(ampCategory({ id: 'a', kind: 'opamp', gx: 0, gy: 0, opModel: 'lmc662' })).toBe('build')
+  it('every op-amp / amp is a buildable part', () => {
+    expect(ampCategory({ id: 'a', kind: 'opamp', gx: 0, gy: 0 })).toBe('build')
     expect(ampCategory({ id: 'a', kind: 'lmc662', gx: 0, gy: 0 })).toBe('build')
     expect(ampCategory({ id: 'a', kind: 'inamp', gx: 0, gy: 0 })).toBe('sim')
     expect(ampCategory({ id: 'a', kind: 'inamp3', gx: 0, gy: 0 })).toBe('sim')

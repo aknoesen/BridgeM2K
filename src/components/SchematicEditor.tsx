@@ -100,7 +100,6 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
   const [placeRotation, setPlaceRotation] = useState(0)
   // Place-time type selectors: when the Op-amp / In-amp tool is active a sub-selector below the
   // toolbar picks the exact part to drop. These map to (kind, opModel) at placement time.
-  const [opampType, setOpampType] = useState<'ideal' | 'lmc662' | 'dip'>('ideal')
   const [inampType, setInampType] = useState<'inamp' | 'inamp3'>('inamp')
   const [simStatus, setSimStatus] = useState('')
   const [simBusy, setSimBusy] = useState(false)
@@ -301,14 +300,9 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
     // place a component. The Op-amp / In-amp tools resolve to a specific kind+model via the
     // place-time sub-selector; everything else places its own kind directly.
     let kind = tool as SchKind
-    let opModel: SchComponent['opModel']
-    if (tool === 'opamp') {
-      if (opampType === 'dip') kind = 'lmc662'
-      else { kind = 'opamp'; opModel = opampType === 'lmc662' ? 'lmc662' : 'ideal' }
-    } else if (tool === 'inamp') {
-      kind = inampType // 'inamp' (ideal) or 'inamp3' (3-op-amp)
-    }
-    const c: SchComponent = { id: newId(kind, sch.components), kind, gx, gy, rotation: placeRotation, value: DEFAULT_VALUE[kind], ...(opModel ? { opModel } : {}) }
+    if (tool === 'inamp') kind = inampType // 'inamp' (ideal) or 'inamp3' (3-op-amp)
+    // The op-amp tool places kind 'opamp' — always an LMC662 (power implied in sim, DIP on the board).
+    const c: SchComponent = { id: newId(kind, sch.components), kind, gx, gy, rotation: placeRotation, value: DEFAULT_VALUE[kind] }
     snapshot()
     setSch((s) => ({ ...s, components: [...s.components, c] }))
     setSelected(c.id)
@@ -465,14 +459,6 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
   function setSelValueNum(v: number) {
     if (!sel) return
     setSch((s) => ({ ...s, components: s.components.map((c) => c.id === sel.id ? { ...c, value: v } : c) }))
-  }
-
-  // Op-amp model selector (ideal VCVS vs the LMC662 behavioural model). Switching to ideal
-  // drops the V+/V- pins; any wires that were on them stay put as free segments.
-  function setSelModel(m: 'ideal' | 'lmc662') {
-    if (!sel) return
-    snapshot()
-    setSch((s) => ({ ...s, components: s.components.map((c) => c.id === sel.id ? { ...c, opModel: m } : c) }))
   }
 
   // In-amp type selector: ideal single-VCVS vs the textbook 3-op-amp topology. Same pinout,
@@ -641,21 +627,8 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
           ))}
         </div>
         {tool === 'opamp' && (
-          <div style={{ marginTop: 6 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: 3 }}>Op-amp type to place:</div>
-            <div className="wave-selector">
-              {([
-                ['ideal', 'Ideal', 'sim'],
-                ['lmc662', 'LMC662', 'build'],
-                ['dip', 'LMC662 DIP', 'build'],
-              ] as const).map(([v, lbl, cat]) => (
-                <button key={v} className={opampType === v ? 'active' : ''} onClick={() => setOpampType(v)}
-                  title={cat === 'build' ? 'Real part — needs V+/V- power' : 'Ideal model — no supply needed'}>{lbl}</button>
-              ))}
-            </div>
-            <div style={{ fontSize: 10, marginTop: 3, color: opampType === 'ideal' ? 'var(--theory-color)' : 'var(--accent-orange)' }}>
-              {opampType === 'ideal' ? 'Simulation only — no supply needed' : 'Simulation + build — wire V+/V- to power it'}
-            </div>
+          <div style={{ fontSize: 10, marginTop: 6, color: 'var(--text-secondary)' }}>
+            LMC662 op-amp — power is implied in simulation; on the breadboard it's an 8-pin DIP whose V+/V− you wire.
           </div>
         )}
         {tool === 'inamp' && (
@@ -728,20 +701,10 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
               )
             })()}
             {sel.kind === 'opamp' && (
-              <>
-                <div className="control-row-inline">
-                  <label>Type</label>
-                  <select value={sel.opModel ?? 'ideal'} onChange={(e) => setSelModel(e.target.value as 'ideal' | 'lmc662')} style={{ width: 150 }}>
-                    <option value="ideal">Ideal (simulation)</option>
-                    <option value="lmc662">LMC662 (sim + build)</option>
-                  </select>
-                </div>
-                {sel.opModel === 'lmc662' && (
-                  <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 2, lineHeight: 1.4 }}>
-                    GBW 1.4 MHz, rail-to-rail out clipped at ±5 V. Bode shows the rolloff; scope shows clipping.
-                  </div>
-                )}
-              </>
+              <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 2, lineHeight: 1.4 }}>
+                LMC662 op-amp. GBW 1.4 MHz, output clips at ±5 V. Power is implied in simulation; on the
+                breadboard it's an 8-pin DIP whose V+/V− you wire to the rails.
+              </div>
             )}
             {(sel.kind === 'inamp' || sel.kind === 'inamp3') && (
               <div className="control-row-inline">
@@ -828,7 +791,7 @@ function renderSymbol(c: SchComponent, px: (g: number) => number, selected: bool
       <g>
         <polyline points={zig} fill="none" stroke={stroke} strokeWidth={sw} />
         {upright(cx, y - 13, <text x={cx} y={y - 13} fill="var(--text-secondary)" fontSize={10} textAnchor="middle">{c.id}</text>)}
-        {upright(cx, y + 18, <text x={cx} y={y + 18} fill="var(--text-primary)" fontSize={10} textAnchor="middle">R</text>)}
+        {upright(cx, y + 18, <text x={cx} y={y + 18} fill="var(--text-primary)" fontSize={9} textAnchor="middle">{fmtEng(c.value ?? 0)}{UNIT[c.kind] ?? ''}</text>)}
       </g>
     )
   } else if (c.kind === 'capacitor') {
@@ -840,7 +803,7 @@ function renderSymbol(c: SchComponent, px: (g: number) => number, selected: bool
         <line x1={cx - 4} y1={y - 11} x2={cx - 4} y2={y + 11} stroke={stroke} strokeWidth={sw} />
         <line x1={cx + 4} y1={y - 11} x2={cx + 4} y2={y + 11} stroke={stroke} strokeWidth={sw} />
         {upright(cx, y - 15, <text x={cx} y={y - 15} fill="var(--text-secondary)" fontSize={10} textAnchor="middle">{c.id}</text>)}
-        {upright(cx, y + 20, <text x={cx} y={y + 20} fill="var(--text-primary)" fontSize={10} textAnchor="middle">C</text>)}
+        {upright(cx, y + 20, <text x={cx} y={y + 20} fill="var(--text-primary)" fontSize={9} textAnchor="middle">{fmtEng(c.value ?? 0)}{UNIT[c.kind] ?? ''}</text>)}
       </g>
     )
   } else if (c.kind === 'diode') {
@@ -908,7 +871,7 @@ function renderSymbol(c: SchComponent, px: (g: number) => number, selected: bool
         <line x1={cx + 18} y1={y} x2={x2} y2={y} stroke={stroke} strokeWidth={sw} />
         <path d={coil} fill="none" stroke={stroke} strokeWidth={sw} />
         {upright(cx, y - 13, <text x={cx} y={y - 13} fill="var(--text-secondary)" fontSize={10} textAnchor="middle">{c.id}</text>)}
-        {upright(cx, y + 18, <text x={cx} y={y + 18} fill="var(--text-primary)" fontSize={10} textAnchor="middle">L</text>)}
+        {upright(cx, y + 18, <text x={cx} y={y + 18} fill="var(--text-primary)" fontSize={9} textAnchor="middle">{fmtEng(c.value ?? 0)}{UNIT[c.kind] ?? ''}</text>)}
       </g>
     )
   } else if (c.kind === 'inamp' || c.kind === 'inamp3') {
@@ -930,22 +893,12 @@ function renderSymbol(c: SchComponent, px: (g: number) => number, selected: bool
     )
   } else if (c.kind === 'opamp') {
     const xL = ax, yT = ay, yB = ay + G(2), xR = ax + G(4), yM = ay + G(1)
-    const xMid = ax + G(2)
     inner = (
       <g>
         <line x1={xL} y1={yT} x2={xL + 10} y2={yT} stroke={stroke} strokeWidth={sw} />
         <line x1={xL} y1={yB} x2={xL + 10} y2={yB} stroke={stroke} strokeWidth={sw} />
         <line x1={xR - 6} y1={yM} x2={xR} y2={yM} stroke={stroke} strokeWidth={sw} />
         <polygon points={`${xL + 10},${yT - 8} ${xL + 10},${yB + 8} ${xR - 6},${yM}`} fill="var(--bg-panel)" stroke={stroke} strokeWidth={sw} />
-        {/* V+ / V- power stubs (top/bottom) — only the LMC662 (sim+build) model has rails */}
-        {c.opModel === 'lmc662' && (
-          <>
-            <line x1={xMid} y1={ay - G(1)} x2={xMid} y2={ay + 2} stroke="#e04040" strokeWidth={sw} />
-            <line x1={xMid} y1={ay + G(3)} x2={xMid} y2={ay + G(2) - 2} stroke="#4a9eff" strokeWidth={sw} />
-            {upright(xMid + 9, ay - G(1) + 4, <text x={xMid + 9} y={ay - G(1) + 4} fill="#e04040" fontSize={9} textAnchor="middle">V+</text>)}
-            {upright(xMid + 9, ay + G(3), <text x={xMid + 9} y={ay + G(3)} fill="#4a9eff" fontSize={9} textAnchor="middle">V−</text>)}
-          </>
-        )}
         {upright(xL + 17, yT + 4, <text x={xL + 17} y={yT + 4} fill="var(--text-primary)" fontSize={11} textAnchor="middle">+</text>)}
         {upright(xL + 17, yB + 1, <text x={xL + 17} y={yB + 1} fill="var(--text-primary)" fontSize={13} textAnchor="middle">−</text>)}
         {upright(xL + 30, yM + 4, <text x={xL + 30} y={yM + 4} fill="var(--text-secondary)" fontSize={10} textAnchor="middle">{c.id}</text>)}

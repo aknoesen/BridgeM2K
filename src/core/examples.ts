@@ -34,57 +34,51 @@ export interface Example {
 const sine = (frequency: number, amplitude = 1): SignalParams =>
   ({ waveType: 'sine', frequency, amplitude, offset: 0, dutyCycle: 50, samplingRate: 100000, duration: 0.016 })
 
-// --- shared amp skeletons (inverting / non-inverting), parameterised by op-amp model ---------
+// --- shared amp skeletons (inverting / non-inverting) — always a real LMC662 with V+/V- rails -----
 
-function invertingAmp(lmc662: boolean): Schematic {
-  const comps: Schematic['components'] = [
-    { id: 'W1', kind: 'awg1', gx: 2, gy: 6 },
-    { id: 'Rin', kind: 'resistor', gx: 4, gy: 6, value: 10000 },
-    { id: 'U1', kind: 'opamp', gx: 10, gy: 4, ...(lmc662 ? { opModel: 'lmc662' as const } : {}) },
-    { id: 'Rf', kind: 'resistor', gx: 10, gy: 8, value: 22000 },
-    { id: 'G1', kind: 'ground', gx: 8, gy: 4 },
-    { id: 'P1', kind: 'scope1', gx: 16, gy: 5 },
-    { id: 'P2', kind: 'scope2', gx: 2, gy: 8 },   // 2+ on the input (CH2 = drive)
-  ]
-  const wires: Schematic['wires'] = [
-    { x1: 2, y1: 6, x2: 4, y2: 6 },   // W1 -> Rin.a
-    { x1: 2, y1: 6, x2: 2, y2: 8 },   // input -> 2+
-    { x1: 6, y1: 6, x2: 10, y2: 6 },  // Rin.b -> inN (summing node)
-    { x1: 10, y1: 4, x2: 8, y2: 4 },  // inP -> ground
-    { x1: 10, y1: 6, x2: 10, y2: 8 }, // inN -> Rf.a
-    { x1: 14, y1: 5, x2: 14, y2: 8 }, // out -> down
-    { x1: 14, y1: 8, x2: 12, y2: 8 }, // -> Rf.b  (feedback)
-    { x1: 14, y1: 5, x2: 16, y2: 5 }, // out -> 1+
-  ]
-  if (lmc662) {
-    comps.push({ id: 'VP', kind: 'vplus', gx: 12, gy: 1 }, { id: 'VN', kind: 'vminus', gx: 12, gy: 9 })
-    wires.push({ x1: 12, y1: 1, x2: 12, y2: 3 }, { x1: 12, y1: 9, x2: 12, y2: 7 }) // V+ -> vpos, V- -> vneg
+function invertingAmp(): Schematic {
+  return {
+    components: [
+      { id: 'W1', kind: 'awg1', gx: 2, gy: 6 },
+      { id: 'Rin', kind: 'resistor', gx: 4, gy: 6, value: 10000 },
+      { id: 'U1', kind: 'opamp', gx: 10, gy: 4 },
+      { id: 'Rf', kind: 'resistor', gx: 10, gy: 8, value: 22000 },
+      { id: 'G1', kind: 'ground', gx: 8, gy: 4 },
+      { id: 'P1', kind: 'scope1', gx: 16, gy: 5 },
+      { id: 'P2', kind: 'scope2', gx: 2, gy: 8 },   // 2+ on the input (CH2 = drive)
+    ],
+    wires: [
+      { x1: 2, y1: 6, x2: 4, y2: 6 },   // W1 -> Rin.a
+      { x1: 2, y1: 6, x2: 2, y2: 8 },   // input -> 2+
+      { x1: 6, y1: 6, x2: 10, y2: 6 },  // Rin.b -> inN (summing node)
+      { x1: 10, y1: 4, x2: 8, y2: 4 },  // inP -> ground
+      { x1: 10, y1: 6, x2: 10, y2: 8 }, // inN -> Rf.a
+      { x1: 14, y1: 5, x2: 14, y2: 8 }, // out -> down
+      { x1: 14, y1: 8, x2: 12, y2: 8 }, // -> Rf.b  (feedback)
+      { x1: 14, y1: 5, x2: 16, y2: 5 }, // out -> 1+
+    ],
   }
-  return { components: comps, wires }
 }
 
-function nonInvertingAmp(lmc662: boolean): Schematic {
-  const comps: Schematic['components'] = [
-    { id: 'W1', kind: 'awg1', gx: 6, gy: 4 },
-    { id: 'U1', kind: 'opamp', gx: 10, gy: 4, ...(lmc662 ? { opModel: 'lmc662' as const } : {}) },
-    { id: 'Rf', kind: 'resistor', gx: 12, gy: 6, value: 10000 },
-    { id: 'Rg', kind: 'resistor', gx: 10, gy: 6, rotation: 1, value: 10000 },
-    { id: 'G1', kind: 'ground', gx: 10, gy: 8 },
-    { id: 'P1', kind: 'scope1', gx: 16, gy: 5 },
-    { id: 'P2', kind: 'scope2', gx: 6, gy: 2 },   // 2+ on the input (CH2 = drive)
-  ]
-  const wires: Schematic['wires'] = [
-    { x1: 6, y1: 4, x2: 10, y2: 4 },  // W1 -> inP
-    { x1: 6, y1: 4, x2: 6, y2: 2 },   // input -> 2+
-    { x1: 10, y1: 6, x2: 12, y2: 6 }, // inN -> Rf.a (Rg.a shares inN at 10,6)
-    { x1: 14, y1: 6, x2: 14, y2: 5 }, // Rf.b -> out
-    { x1: 14, y1: 5, x2: 16, y2: 5 }, // out -> 1+
-  ]
-  if (lmc662) {
-    comps.push({ id: 'VP', kind: 'vplus', gx: 12, gy: 1 }, { id: 'VN', kind: 'vminus', gx: 12, gy: 9 })
-    wires.push({ x1: 12, y1: 1, x2: 12, y2: 3 }, { x1: 12, y1: 9, x2: 12, y2: 7 })
+function nonInvertingAmp(): Schematic {
+  return {
+    components: [
+      { id: 'W1', kind: 'awg1', gx: 6, gy: 4 },
+      { id: 'U1', kind: 'opamp', gx: 10, gy: 4 },
+      { id: 'Rf', kind: 'resistor', gx: 12, gy: 6, value: 10000 },
+      { id: 'Rg', kind: 'resistor', gx: 10, gy: 6, rotation: 1, value: 10000 },
+      { id: 'G1', kind: 'ground', gx: 10, gy: 8 },
+      { id: 'P1', kind: 'scope1', gx: 16, gy: 5 },
+      { id: 'P2', kind: 'scope2', gx: 6, gy: 2 },   // 2+ on the input (CH2 = drive)
+    ],
+    wires: [
+      { x1: 6, y1: 4, x2: 10, y2: 4 },  // W1 -> inP
+      { x1: 6, y1: 4, x2: 6, y2: 2 },   // input -> 2+
+      { x1: 10, y1: 6, x2: 12, y2: 6 }, // inN -> Rf.a (Rg.a shares inN at 10,6)
+      { x1: 14, y1: 6, x2: 14, y2: 5 }, // Rf.b -> out
+      { x1: 14, y1: 5, x2: 16, y2: 5 }, // out -> 1+
+    ],
   }
-  return { components: comps, wires }
 }
 
 // --- the library ----------------------------------------------------------------------------
@@ -185,28 +179,16 @@ export const EXAMPLES: Example[] = [
     },
   },
   {
-    id: 'inv-ideal', name: 'Inverting amp ×−2.2 (ideal)', group: 'Amplifiers',
-    blurb: 'Ideal op-amp (simulation only, no supplies). Gain −Rf/Rin = −2.2 (CH2 in, CH1 out — note the inversion).',
+    id: 'inv-amp', name: 'Inverting amp ×−2.2 (LMC662)', group: 'Amplifiers',
+    blurb: 'LMC662 op-amp on ±5 V rails. Gain −Rf/Rin = −2.2 (CH2 in, CH1 out — note the inversion). Buildable on the breadboard as an 8-pin DIP.',
     w1: sine(1000), ch1Vdiv: 1, ch2Vdiv: 1,
-    schematic: invertingAmp(false),
+    schematic: invertingAmp(),
   },
   {
-    id: 'inv-lmc662', name: 'Inverting amp ×−2.2 (LMC662)', group: 'Amplifiers',
-    blurb: 'Real LMC662 (needs ±5 V rails). Same gain; shows bandwidth + clipping (CH2 in, CH1 out).',
+    id: 'noninv-amp', name: 'Non-inverting amp ×2 (LMC662)', group: 'Amplifiers',
+    blurb: 'LMC662 op-amp on ±5 V rails. Gain 1 + Rf/Rg = 2 (CH2 in, CH1 out — same phase, 2× taller). Buildable on the breadboard as an 8-pin DIP.',
     w1: sine(1000), ch1Vdiv: 1, ch2Vdiv: 1,
-    schematic: invertingAmp(true),
-  },
-  {
-    id: 'noninv-ideal', name: 'Non-inverting amp ×2 (ideal)', group: 'Amplifiers',
-    blurb: 'Ideal op-amp (simulation only). Gain 1 + Rf/Rg = 2 (CH2 in, CH1 out — same phase, 2× taller).',
-    w1: sine(1000), ch1Vdiv: 1, ch2Vdiv: 1,
-    schematic: nonInvertingAmp(false),
-  },
-  {
-    id: 'noninv-lmc662', name: 'Non-inverting amp ×2 (LMC662)', group: 'Amplifiers',
-    blurb: 'Real LMC662 (needs ±5 V rails). Same gain; shows bandwidth + clipping (CH2 in, CH1 out).',
-    w1: sine(1000), ch1Vdiv: 1, ch2Vdiv: 1,
-    schematic: nonInvertingAmp(true),
+    schematic: nonInvertingAmp(),
   },
   {
     id: 'rlc-bandpass', name: 'RLC band-pass (~1.6 kHz)', group: 'Passive',
@@ -263,10 +245,11 @@ export const EXAMPLES: Example[] = [
   {
     id: 'differentiator', name: 'Differentiator (op-amp)', group: 'Amplifiers',
     blurb: 'Inverting differentiator. +20 dB/decade (0 dB near 160 Hz): a triangle differentiates to a square (CH2 in, CH1 out).',
-    // Triangle in -> square out (derivative of constant slopes). CH1 = output (~±1.6 V, 0.5 V/div),
-    // CH2 = input (4 Vpp, 1 V/div).
+    // Triangle in -> square out (derivative of constant slopes). With the real LMC662 the square has
+    // some peaking at the corners (a practical differentiator), so the output runs a few volts.
+    // CH1 = output (~±3 V, 1 V/div), CH2 = input (4 Vpp, 1 V/div).
     w1: { waveType: 'triangle', frequency: 200, amplitude: 2, offset: 0, dutyCycle: 50, samplingRate: 100000, duration: 0.016 },
-    ch1Vdiv: 0.5, ch2Vdiv: 1,
+    ch1Vdiv: 1, ch2Vdiv: 1,
     schematic: {
       components: [
         { id: 'W1', kind: 'awg1', gx: 2, gy: 6 },
