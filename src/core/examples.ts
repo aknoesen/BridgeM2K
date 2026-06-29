@@ -191,6 +191,44 @@ export const EXAMPLES: Example[] = [
     },
   },
   {
+    id: 'rl-lp', name: 'RL low-pass (~16 kHz)', group: 'Passive',
+    blurb: 'Series L, shunt R (output across R). 1st-order: −3 dB near 16 kHz, −20 dB/decade. f_c = R/2πL (1 kΩ, 10 mH — both kit values; R ≫ the M2K\'s 50 Ω output resistance so the textbook corner holds).',
+    w1: sine(16000), ch1Vdiv: 0.5,
+    schematic: {
+      components: [
+        { id: 'W1', kind: 'awg1', gx: 2, gy: 4 },
+        { id: 'L1', kind: 'inductor', gx: 4, gy: 4, value: 1e-2 },
+        { id: 'R1', kind: 'resistor', gx: 6, gy: 4, rotation: 1, value: 1000 },
+        { id: 'G1', kind: 'ground', gx: 6, gy: 8 },
+        { id: 'P1', kind: 'scope1', gx: 8, gy: 4 },
+      ],
+      wires: [
+        { x1: 2, y1: 4, x2: 4, y2: 4 },
+        { x1: 6, y1: 4, x2: 8, y2: 4 },
+        { x1: 6, y1: 6, x2: 6, y2: 8 },   // shunt leg -> ground (explicit, so moves follow)
+      ],
+    },
+  },
+  {
+    id: 'rl-hp', name: 'RL high-pass (~16 kHz)', group: 'Passive',
+    blurb: 'Series R, shunt L (output across L). 1st-order: −3 dB near 16 kHz, +20 dB/decade below. f_c = R/2πL (1 kΩ, 10 mH — both kit values; R ≫ the M2K\'s 50 Ω output resistance so the textbook corner holds).',
+    w1: sine(16000), ch1Vdiv: 0.5,
+    schematic: {
+      components: [
+        { id: 'W1', kind: 'awg1', gx: 2, gy: 4 },
+        { id: 'R1', kind: 'resistor', gx: 4, gy: 4, value: 1000 },
+        { id: 'L1', kind: 'inductor', gx: 6, gy: 4, rotation: 1, value: 1e-2 },
+        { id: 'G1', kind: 'ground', gx: 6, gy: 8 },
+        { id: 'P1', kind: 'scope1', gx: 8, gy: 4 },
+      ],
+      wires: [
+        { x1: 2, y1: 4, x2: 4, y2: 4 },
+        { x1: 6, y1: 4, x2: 8, y2: 4 },
+        { x1: 6, y1: 6, x2: 6, y2: 8 },   // shunt leg -> ground (explicit, so moves follow)
+      ],
+    },
+  },
+  {
     id: 'inv-amp', name: 'Inverting amp ×−2 (OP484)', group: 'Amplifiers',
     blurb: 'Kit OP484 (rail-to-rail) op-amp on ±5 V rails. Gain −Rf/Rin = −2 (Rf 20 kΩ, Rin 10 kΩ — both kit values; CH2 in, CH1 out, note the inversion). Buildable on the breadboard as a DIP.',
     w1: sine(1000), ch1Vdiv: 1, ch2Vdiv: 1,
