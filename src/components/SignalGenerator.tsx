@@ -41,8 +41,10 @@ export default function SignalGenerator({ params, params2, signal, signal2, runn
       return
     }
 
-    // Show 4 periods of the slower generator so both are visible.
-    const fShow = Math.min(params.frequency, params2.frequency)
+    // Show 4 periods of the slower generator so both are visible. Ignore a transiently empty/NaN
+    // frequency field (the field stays clearable mid-typing; the core clamps frequency anyway).
+    const validF = [params.frequency, params2.frequency].filter((f) => Number.isFinite(f) && f > 0)
+    const fShow = validF.length ? Math.min(...validF) : 1
     const downsample = (s: { t: Float64Array; x: Float64Array }) => {
       const samplesToShow = Math.min(s.t.length, Math.round(4 * params.samplingRate / fShow))
       const step = Math.max(1, Math.floor(samplesToShow / 2000))
@@ -98,7 +100,12 @@ export default function SignalGenerator({ params, params2, signal, signal2, runn
   const changeWave = (w: WaveType) => { if (gen === 'W1') onWaveTypeChange(w); else onParam2Change('waveType', w) }
 
   const freq = p.frequency
-  const freqLabel = freq >= 1000 ? `${(freq / 1000).toFixed(freq % 1000 === 0 ? 0 : 2)} kHz` : `${freq} Hz`
+  // The number field can be transiently empty/NaN/0/negative while typing; show a dash in the
+  // readouts instead of "NaN Hz". The signal itself stays safe (core clamps to a 1 Hz floor).
+  const freqValid = Number.isFinite(freq) && freq > 0
+  const freqLabel = !freqValid
+    ? '—'
+    : freq >= 1000 ? `${(freq / 1000).toFixed(freq % 1000 === 0 ? 0 : 2)} kHz` : `${freq} Hz`
 
   return (
     <div className="instrument-panel">
@@ -221,7 +228,7 @@ export default function SignalGenerator({ params, params2, signal, signal2, runn
         <div className="section-title">Info — {gen}</div>
         <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
           <div>Fs: {(p.samplingRate / 1000).toFixed(0)} kSa/s</div>
-          <div>Period: {(1000 / p.frequency).toFixed(2)} ms</div>
+          <div>Period: {freqValid ? `${(1000 / freq).toFixed(2)} ms` : '—'}</div>
           <div>Average: {(p.offset + (p.waveType === 'square' ? p.amplitude * (2 * p.dutyCycle / 100 - 1) : 0)).toFixed(3)} V</div>
         </div>
       </div>
