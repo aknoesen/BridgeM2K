@@ -19,6 +19,48 @@
   height: 100%;
 }
 
+/* F-6: Board-view layout controls — a thin control strip plus a draggable divider between the
+   schematic and breadboard panes. Stacked (default) or side-by-side; colors from theme variables. */
+.board-layout-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+.board-layout-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-right: 4px;
+}
+.board-orient-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--bg-display);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.board-orient-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+/* The divider is a flex item on the cross axis; it stretches to fill the other axis automatically. */
+.board-splitter {
+  flex: 0 0 6px;
+  background: var(--border);
+  transition: background 0.12s;
+  touch-action: none;
+}
+.board-splitter:hover {
+  background: var(--accent-blue);
+}
+.board-splitter.horizontal { cursor: row-resize; }
+.board-splitter.vertical { cursor: col-resize; }
+
 /* ── Display area (left, fills remaining space) ── */
 .display-area {
   flex: 1;

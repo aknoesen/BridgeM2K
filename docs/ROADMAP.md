@@ -151,6 +151,7 @@ Spec: `docs/specs/breadboard.md`
 | F-3 | DIP/IC footprints on the board — LMC662 8-pin DIP (generic DIP framework; op-amp/INA are a trivial follow-on) | F-2 | DONE |
 | F-4 | (Stretch) remaining DIP footprints (op-amp, INA) + optional "show one valid layout" hint | F-3 | TODO |
 | F-5 | Fixed M2K connector strips (top: 1+ 2+ GND V+ W1 GND TI; bottom: 1− 2− GND V− W2 GND), color-coded V+ red / V− blue / GND neutral, replacing placeable ports — jumper from them; Check anchors on the terminals. Standard power distribution pre-wired & always-present (GND→both outer rails, V+→top inner, V−→bottom inner), rails labelled; terminal jumpers carry the terminal's colour | F-2 | DONE |
+| F-6 | **Breadboard-view layout controls.** The combined `breadboard` view stacks SchematicEditor + Breadboard 50/50 in one 100vh column and is cramped. Add a draggable horizontal splitter (remembered ratio, localStorage) and a stacked↔side-by-side orientation toggle for wide monitors. Keeps the stacked transfer metaphor as default; no new dependency; does not touch `core/signal.ts`. See `docs/specs/breadboard-view-layout.md`. | F-2 | DONE |
 
 Decisions (locked with andre, 2026-06-26):
 - **Verification loop is the centerpiece** — Check tells the student if their board is electrically

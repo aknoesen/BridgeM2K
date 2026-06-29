@@ -85,6 +85,31 @@ function loadStoredBoard(): BoardLayout {
   return { parts: [], jumpers: [], ports: [] }
 }
 
+// F-6: the combined Board view's layout controls. The split ratio is the fraction of the cross-axis
+// the schematic (first pane) gets; clamped so neither pane fully collapses. Orientation keeps the
+// Track F stacked transfer-metaphor as the default, with side-by-side opt-in for wide monitors.
+type BoardOrient = 'stacked' | 'side'
+const BOARD_SPLIT_KEY = 'm2k-board-split-v1'
+const BOARD_ORIENT_KEY = 'm2k-board-orient-v1'
+const BOARD_SPLIT_MIN = 0.15
+const BOARD_SPLIT_MAX = 0.85
+
+function loadBoardSplit(): number {
+  try {
+    const n = parseFloat(localStorage.getItem(BOARD_SPLIT_KEY) ?? '')
+    if (Number.isFinite(n) && n >= BOARD_SPLIT_MIN && n <= BOARD_SPLIT_MAX) return n
+  } catch { /* ignore corrupt storage */ }
+  return 0.5
+}
+
+function loadBoardOrient(): BoardOrient {
+  try {
+    const r = localStorage.getItem(BOARD_ORIENT_KEY)
+    if (r === 'side' || r === 'stacked') return r
+  } catch { /* ignore corrupt storage */ }
+  return 'stacked'
+}
+
 export default function App() {
   const stored0 = (() => {
     try { const r = localStorage.getItem(WORKSPACE_KEY); if (r) return JSON.parse(r) as { active?: ActiveInstrument; presetId?: string | null } } catch { /* ignore */ }
@@ -107,6 +132,35 @@ export default function App() {
   const [running, setRunning] = useState(true)
   const [schematic, setSchematic] = useState<Schematic>(loadStoredSchematic)
   const [board, setBoard] = useState<BoardLayout>(loadStoredBoard)
+
+  // F-6: Board-view layout (split ratio + orientation), persisted so a user's chosen division sticks.
+  const [boardSplit, setBoardSplit] = useState<number>(loadBoardSplit)
+  const [boardOrient, setBoardOrient] = useState<BoardOrient>(loadBoardOrient)
+  const boardSplitRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => { try { localStorage.setItem(BOARD_SPLIT_KEY, String(boardSplit)) } catch { /* quota */ } }, [boardSplit])
+  useEffect(() => { try { localStorage.setItem(BOARD_ORIENT_KEY, boardOrient) } catch { /* quota */ } }, [boardOrient])
+
+  // Drag the divider: convert the pointer's position within the split container into a clamped ratio.
+  // Both panes stay mounted; only flex-basis changes. A resize event on release lets any size-aware
+  // child re-measure (the canvas panes read their own box; this keeps that contract intact).
+  function onSplitterDown(e: React.PointerEvent) {
+    e.preventDefault()
+    const container = boardSplitRef.current
+    if (!container) return
+    const rect = container.getBoundingClientRect()
+    const vertical = boardOrient === 'stacked'
+    const move = (ev: PointerEvent) => {
+      const frac = vertical ? (ev.clientY - rect.top) / rect.height : (ev.clientX - rect.left) / rect.width
+      setBoardSplit(Math.min(BOARD_SPLIT_MAX, Math.max(BOARD_SPLIT_MIN, frac)))
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.dispatchEvent(new Event('resize'))
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
 
   // Shared schematic undo/redo history (one stack owned here, so every editor of the schematic —
   // the Circuit editor and the Board tab's lab load — pushes to the same history). Callers snapshot
@@ -388,19 +442,40 @@ export default function App() {
           snapshot={snapshotSchematic} undo={undoSchematic} redo={redoSchematic}
           onLoadGenerators={(w1, w2) => { if (w1) setParams({ ...DEFAULT_PARAMS, ...w1 }); setParams2(w2 ? { ...DEFAULT_PARAMS2, ...w2 } : DEFAULT_PARAMS2) }}
           onLoadScope={(req) => setScopeReq(req)} onOpenTracer={() => { setActive('curvetracer'); setPresetId(null) }} />
-      case 'breadboard':
+      case 'breadboard': {
+        const vertical = boardOrient === 'stacked'
         return (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', minHeight: 0 }}>
-            <div className="stacked-pane"><SchematicEditor schematic={schematic} setSchematic={setSchematic}
-              snapshot={snapshotSchematic} undo={undoSchematic} redo={redoSchematic}
-              onLoadGenerators={(w1, w2) => { if (w1) setParams({ ...DEFAULT_PARAMS, ...w1 }); setParams2(w2 ? { ...DEFAULT_PARAMS2, ...w2 } : DEFAULT_PARAMS2) }}
-          onLoadScope={(req) => setScopeReq(req)} onOpenTracer={() => { setActive('curvetracer'); setPresetId(null) }} /></div>
-            <div className="stacked-pane"><Breadboard schematic={schematic} setSchematic={setSchematic} board={board} setBoard={setBoard}
-              snapshotSchematic={snapshotSchematic}
-              generators={{ w1: params, w2: params2 }}
-              onLoadGenerators={(w1, w2) => { setParams({ ...DEFAULT_PARAMS, ...w1 }); setParams2({ ...DEFAULT_PARAMS2, ...w2 }) }} /></div>
+            <div className="board-layout-bar">
+              <span className="board-layout-label">Board view</span>
+              <button className="board-orient-btn" onClick={() => setBoardOrient(vertical ? 'side' : 'stacked')}
+                title={vertical ? 'Switch to side-by-side (wide monitors)' : 'Switch to stacked (schematic above board)'}>
+                {vertical ? '⬍ Stacked' : '⬌ Side by side'}
+              </button>
+              <button className="board-orient-btn" onClick={() => setBoardSplit(0.5)} title="Reset the split to 50/50">
+                Reset split
+              </button>
+            </div>
+            <div ref={boardSplitRef} className="board-split" style={{ flex: 1, minHeight: 0, minWidth: 0,
+              display: 'flex', flexDirection: vertical ? 'column' : 'row' }}>
+              <div className="stacked-pane" style={{ flex: `0 0 ${boardSplit * 100}%`, minHeight: 0, minWidth: 0 }}>
+                <SchematicEditor schematic={schematic} setSchematic={setSchematic}
+                  snapshot={snapshotSchematic} undo={undoSchematic} redo={redoSchematic}
+                  onLoadGenerators={(w1, w2) => { if (w1) setParams({ ...DEFAULT_PARAMS, ...w1 }); setParams2(w2 ? { ...DEFAULT_PARAMS2, ...w2 } : DEFAULT_PARAMS2) }}
+                  onLoadScope={(req) => setScopeReq(req)} onOpenTracer={() => { setActive('curvetracer'); setPresetId(null) }} />
+              </div>
+              <div className={`board-splitter ${vertical ? 'horizontal' : 'vertical'}`} onPointerDown={onSplitterDown}
+                role="separator" aria-orientation={vertical ? 'horizontal' : 'vertical'} title="Drag to resize" />
+              <div className="stacked-pane" style={{ flex: '1 1 0', minHeight: 0, minWidth: 0 }}>
+                <Breadboard schematic={schematic} setSchematic={setSchematic} board={board} setBoard={setBoard}
+                  snapshotSchematic={snapshotSchematic}
+                  generators={{ w1: params, w2: params2 }}
+                  onLoadGenerators={(w1, w2) => { setParams({ ...DEFAULT_PARAMS, ...w1 }); setParams2({ ...DEFAULT_PARAMS2, ...w2 }) }} />
+              </div>
+            </div>
           </div>
         )
+      }
       case 'network':
         return <NetworkAnalyzer circuit={drawnValid ? drawn.circuit : undefined} dutName={drawnValid ? 'your drawn circuit' : undefined}
           probes={drawnValid ? drawn.probes : undefined} tunables={tunables} onTune={tuneComponent} />

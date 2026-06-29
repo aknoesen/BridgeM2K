@@ -10,6 +10,23 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Next session: start here (updated 2026-06-28)
 
+**F-6 (Breadboard-view layout controls) is DONE.** The combined `breadboard` view in `App.tsx`
+no longer hard-codes a 50/50 vertical stack: a **draggable splitter** between the SchematicEditor
+and Breadboard panes sets the ratio (clamped 15–85 %), persisted to `localStorage`
+(`m2k-board-split-v1`) and restored on load; a **stacked↔side-by-side orientation toggle**
+(persisted `m2k-board-orient-v1`, stacked default) re-flows the same ratio onto the other axis for
+wide monitors. Layout-only — both panes stay mounted, resize via `flex-basis` (no remount), and
+`SchematicEditor`/`Breadboard` props/internals are untouched. New styles live in
+`components/Instrument.css` (theme variables only). Verified live: drag changes + persists the
+ratio, reload restores `firstPaneBasis: 70%`/`flexDirection: column`, orientation toggles with no
+remount errors, no console errors; **12-bit Spectrum floor still −104.29 dBFS**. Next ROADMAP
+`TODO` in order is **F-4** (stretch DIP footprints) then **KICAD-1**. Full detail in the top log
+entry below.
+
+---
+
+### Earlier handoff (still relevant)
+
 **SCH-9 (kit op-amp library) is DONE.** A new pure/tested `core/opamps.ts` holds the verified
 ADALP2000 op-amp catalog (`op27 op37 op97 op482 op484 adtl082 ad8542`) with `opampList()` /
 `getOpamp()` / `isKitOpamp()` and `buildOpampSubckt()` — a pure ngspice **level-1 macromodel**
@@ -29,11 +46,7 @@ documented in the log entry: `core/schematic.ts` (the `toCircuit` seam, to pass 
 parallel to SWEEP-1 touching `netlist.ts`) and `core/netlist.ts` op-amp **card section only** (the
 directive/element structure is untouched). (2) `src/components/Quickstart.tsx` has an **uncommitted
 SWEEP-1 leftover** (Curve Tracer walkthrough) stranded in the working tree — *not* part of SCH-9,
-left unstaged; it should be committed separately under SWEEP-1.
-
----
-
-### Earlier handoff (still relevant)
+left unstaged; it should be committed separately under SWEEP-1. *(Resolved: committed as `6c77d53`.)*
 
 **SCH-10 (passives as kit values) is DONE.** A new pure/tested `core/kit.ts` holds the verified
 ADALP2000 catalogs (R/C/L/pots) with `kitValues` / `isKitValue` / `nearestKitValue` / `formatValue`;
@@ -84,6 +97,55 @@ the top log entry below.
 ---
 
 ## Log
+
+### 2026-06-28 — F-6 Breadboard-view layout controls — DONE
+
+**By:** Claude Code session
+**Commit:** <this commit>
+
+**What I did:**
+- Replaced the fixed 50/50 vertical stack in `App.tsx` (the `'breadboard'` case) with a **resizable
+  split**: a thin themed `.board-splitter` between the SchematicEditor and Breadboard panes. Dragging
+  it (pointer events on the divider → window `pointermove`/`pointerup`) sets the split ratio from the
+  pointer's position within the container, clamped to 0.15–0.85 so neither pane collapses. A `resize`
+  event fires on release so size-aware children re-measure.
+- **Persistence:** new state `boardSplit` (ratio) + `boardOrient` (`'stacked' | 'side'`) with
+  loaders + `useEffect` writers, mirroring the existing circuit/board autosave pattern. Keys
+  `m2k-board-split-v1` and `m2k-board-orient-v1`. Restored on load; defaults 0.5 / `stacked`.
+- **Orientation toggle** in a new `.board-layout-bar` strip: stacked (default, column — keeps the
+  Track F transfer metaphor) ↔ side-by-side (row, for wide monitors). The same ratio drives whichever
+  axis is active (`flexDirection` + the first pane's `flex-basis`). A "Reset split" button restores
+  50/50.
+- New CSS in `components/Instrument.css` (`.board-layout-bar`, `.board-layout-label`,
+  `.board-orient-btn`, `.board-split`, `.board-splitter`) — all colors from existing theme variables
+  (`--bg-panel`, `--bg-display`, `--border`, `--accent-blue`, `--text-*`). No new variable needed.
+- Layout only: both panes stay mounted; resize is `flex-basis`/`flexDirection`, never a remount.
+  SchematicEditor/Breadboard props and internals are untouched.
+
+**Verification (Definition of Done):**
+- build clean: yes (`tsc && vite build`, zero errors, no `any`/`@ts-ignore`).
+- no console errors: yes (checked in the live dev server, normal use + drag + toggle + reload).
+- 12-bit spectrum floor at −104 dBFS confirmed: **yes — −104.29 dBFS** (default square/1 kHz, Hanning,
+  12-bit; read straight off the Plotly "Floor (12-bit)" trace; SNR ≈ 74 dB). Signal path untouched
+  (`git diff` shows only `App.tsx` + `Instrument.css` + docs), so the canary is structurally safe and
+  was confirmed live anyway.
+- math sanity: n/a — no `core/` logic added (pure layout). Live behaviour verified instead: drag set
+  `m2k-board-split-v1` 0.5 → 0.7 and persisted; reload restored `firstPaneBasis: 70%` /
+  `flexDirection: column`; orientation toggled stacked↔side-by-side with no remount errors.
+
+**State for the next session:**
+- The Board view is now user-resizable + re-orientable, with the choice remembered. Defaults are
+  unchanged for any existing user (stacked 50/50 until they touch the controls).
+- A small harness note: the Chrome-automation `left_click_drag` emits **mouse**, not **pointer**,
+  events, so it did not exercise the splitter; the drag was verified by dispatching real
+  `PointerEvent`s (and the persisted ratio). Real mouse/touch input fires `pointerdown` normally.
+
+**Open questions / flags for andre:**
+- None. All changes are inside the F-6 allowed-files set (`App.tsx`, `Instrument.css`,
+  `ROADMAP.md`, `PROGRESS.md`, the F-6 spec). `core/signal.ts` and the instrument math were not
+  touched.
+
+---
 
 ### 2026-06-28 — SCH-9 kit op-amp library — DONE
 
