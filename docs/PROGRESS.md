@@ -10,6 +10,28 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Next session: start here (updated 2026-06-28)
 
+**SIG-1 (settable ADC sample rate) is DONE.** The Spectrum Analyzer has an **Acquisition (ADC)**
+section with an **Fs preset dropdown** (5/10/20/50/100/200 kSa/s, default 100) that sets
+`params.samplingRate` on **both** channels, plus a live **Fs / N / bin-width (Fs/N) + Nyquist**
+readout. The scope capture path already honoured `params.samplingRate` (no change needed). All three
+demos work and were verified live: **aliasing** (6 kHz at Fs=10 kSa/s folds to exactly 4 kHz, bin 64),
+**oversampling** (floor −104.29 → −107.30 dBFS at 200 kSa/s, the ~3 dB processing gain), and the
+**bin-width readout**. The protected math was **not touched** — only `snapDuration` was *exported*
+(plumbing) for the readout/tests; tau, the periodic window denominator, Bluestein, and the synthetic
+noise model are untouched, so the **12-bit canary holds at −104.29 dBFS** (100 kSa/s, square/1 kHz/
+Hanning). New `core/signal.test.ts` (4 tests) asserts zero inter-harmonic leakage at every preset and
+the alias landing on its exact bin. Next ROADMAP `TODO` in Track I is **SIG-2** (optional DAC
+quantization, default OFF — do NOT start without being asked). Full detail in the top log entry below.
+
+**Also landed this session (separate commits):** per-panel **ErrorBoundary** (`cc01e99`) and the
+**scope blank-screen fix** (`067c715`, Plotly YT↔XY `scaleanchor` re-init), plus a **bug-report
+template + About link** (`28f92d6`). `README.md` has a small uncommitted course-agnostic edit left
+for andre.
+
+---
+
+### Earlier handoff (still relevant)
+
 **F-6 (Breadboard-view layout controls) is DONE.** The combined `breadboard` view in `App.tsx`
 no longer hard-codes a 50/50 vertical stack: a **draggable splitter** between the SchematicEditor
 and Breadboard panes sets the ratio (clamped 15–85 %), persisted to `localStorage`
@@ -22,10 +44,6 @@ ratio, reload restores `firstPaneBasis: 70%`/`flexDirection: column`, orientatio
 remount errors, no console errors; **12-bit Spectrum floor still −104.29 dBFS**. Next ROADMAP
 `TODO` in order is **F-4** (stretch DIP footprints) then **KICAD-1**. Full detail in the top log
 entry below.
-
----
-
-### Earlier handoff (still relevant)
 
 **SCH-9 (kit op-amp library) is DONE.** A new pure/tested `core/opamps.ts` holds the verified
 ADALP2000 op-amp catalog (`op27 op37 op97 op482 op484 adtl082 ad8542`) with `opampList()` /
@@ -97,6 +115,51 @@ the top log entry below.
 ---
 
 ## Log
+
+### 2026-06-28 — SIG-1 settable ADC sample rate — DONE
+
+**By:** Claude Code session
+**Commit:** <this commit>
+
+**What I did:**
+- `components/SpectrumAnalyzer.tsx`: new **Acquisition (ADC)** section with an Fs preset dropdown
+  (`FS_PRESETS = [5,10,20,50,100,200] kSa/s`, default 100). Selecting a rate calls a `setFs` that
+  sets `samplingRate` on **both** channels (acquisition is one global rate; the scope reads
+  `params.samplingRate` and so follows). Live **Fs / N / bin-width (= Fs/N) / Nyquist** readout, with
+  `N` from the same `snapDuration` the FFT uses. Added `params2.samplingRate` to the persistence/avg
+  buffer-reset effect deps (buffers already reset on `params.samplingRate`).
+- `core/signal.ts`: **exported `snapDuration`** (plumbing) so the readout and tests compute `N`
+  identically to `generateSignal`. **No protected math touched** — tau, the periodic window
+  denominator, Bluestein, and the synthetic-noise model are byte-for-byte unchanged.
+- `core/signal.test.ts` (new, 4 tests): the 12-bit canary at 100 kSa/s (N=1600, floor ≈ −104.29, no
+  inter-harmonic leakage); zero leakage at **every** preset (1 kHz sine lands on an exact bin); the
+  documented alias pair (6 kHz @ 10 kSa/s → exact bin 64 = 4 kHz); and binWidth = Fs/N tracking Fs.
+- Scope capture path: confirmed it already derives Fs from `params.samplingRate`
+  (`Oscilloscope.tsx` caps its capture `fs` at it; App passes `params.samplingRate` as `circuitFs`),
+  so it honours the new control with **no change** to `Oscilloscope.tsx`/`App.tsx`.
+
+**Verification (Definition of Done):**
+- build clean: yes (`tsc && vite build`).
+- npm test: 119/119 green (115 prior + 4 new).
+- 12-bit spectrum floor at −104 dBFS confirmed: **yes — −104.29 dBFS** live (read off the Plotly
+  "Floor (12-bit)" trace, 100 kSa/s default), signal path untouched.
+- math sanity (live): aliasing 6 kHz @ 10 kSa/s → marker reads exactly 4.000 kHz; oversampling
+  200 kSa/s → floor −107.30 dBFS (≈ −3 dB processing gain over 100 kSa/s); readout N=3200, bin 62.5 Hz.
+- no console errors.
+
+**State for the next session:**
+- Fs is now a first-class acquisition control on the Spectrum (and the scope follows). The bin-landing
+  invariant holds because every preset keeps `Fs/f` an integer for the 1 kHz demo, and the shipped
+  alias pair (5/3 ratio, numPeriods a multiple of 3) lands exactly — `snapDuration`'s math was NOT
+  changed (no LCM extension needed).
+- **SIG-2 is the next Track I phase** (optional, default-OFF DAC quantization) — do not start without
+  an explicit ask; it must keep the ADC canary clean.
+
+**Open questions / flags for andre:**
+- All SIG-1 changes are within the spec's allowed set. `README.md` has a small unrelated uncommitted
+  course-agnostic edit (not mine), left untouched for you.
+
+---
 
 ### 2026-06-28 — F-6 Breadboard-view layout controls — DONE
 

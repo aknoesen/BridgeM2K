@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Plotly from 'plotly.js-dist-min'
-import { SignalParams, computeSpectrum, theoreticalHarmonics, WindowType } from '../core/signal'
+import { SignalParams, computeSpectrum, theoreticalHarmonics, WindowType, snapDuration } from '../core/signal'
 import { exportPlotlyToPng } from './exportImage'
 import './Instrument.css'
 
@@ -26,6 +26,9 @@ const WINDOWS: { label: string; value: WindowType }[] = [
   { label: 'Rectangle', value: 'rectangle' },
 ]
 const BIT_DEPTHS = [4, 8, 12]
+// SIG-1: acquisition sample-rate presets (Sa/s). Each keeps Fs/f an integer for the default 1 kHz
+// signal → exact bins → zero inter-harmonic leakage (see core/signal.ts snapDuration). Default 100k.
+const FS_PRESETS = [5000, 10000, 20000, 50000, 100000, 200000]
 const PERSIST_DEPTH = 20   // frames kept for fade persistence
 const CH1_HEX = '#f0a030'
 const CH2_HEX = '#40c0e0'
@@ -114,7 +117,7 @@ export default function SpectrumAnalyzer({
     prevBinCountRef.current = 0
   }, [bits, freqMax, windowType, channel,
       params.frequency, params.waveType, params.dutyCycle, params.samplingRate,
-      params2.frequency, params2.waveType, params2.dutyCycle])
+      params2.frequency, params2.waveType, params2.dutyCycle, params2.samplingRate])
 
   useEffect(() => {
     if (!plotRef.current) return
@@ -243,6 +246,15 @@ export default function SpectrumAnalyzer({
 
   const snrDb = (6.02 * bits + 1.76).toFixed(0)
 
+  // SIG-1 acquisition readout. N is the exact FFT length the snap produces for the displayed
+  // channel; bin width = Fs / N. Changing Fs on the dropdown sets it on BOTH channels so the
+  // whole acquisition runs at one rate (and the scope, which reads params.samplingRate, follows).
+  const acqFs = par.samplingRate
+  const acqN = snapDuration(par.duration, par.frequency, acqFs)
+  const binWidthReadout = acqN > 0 ? acqFs / acqN : 0
+  const setFs = (fs: number) => { onParamChange('samplingRate', fs); onParam2Change('samplingRate', fs) }
+  const fmtFs = (fs: number) => `${fs / 1000} kSa/s`
+
   return (
     <div className="instrument-panel">
       <div className="display-area">
@@ -300,6 +312,18 @@ export default function SpectrumAnalyzer({
           <select value={windowType} onChange={e => setWindowType(e.target.value as WindowType)} style={{ width: 90 }}>
             {WINDOWS.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
           </select>
+        </div>
+
+        <div className="section-title">Acquisition (ADC)</div>
+        <div className="control-row-inline">
+          <label title="ADC sample rate. Below 2× a signal component, that component aliases (folds down).">Sample rate</label>
+          <select value={acqFs} onChange={e => setFs(Number(e.target.value))} style={{ width: 90 }}>
+            {FS_PRESETS.map(fs => <option key={fs} value={fs}>{fmtFs(fs)}</option>)}
+          </select>
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.5, fontFamily: 'monospace' }}>
+          Fs = {fmtFs(acqFs)} &nbsp; N = {acqN} <br />
+          bin = Fs/N = {binWidthReadout.toFixed(2)} Hz &nbsp; (Nyquist {(acqFs / 2000).toFixed(0)} kHz)
         </div>
 
         <div className="section-title">Signal — {editIsCh2 ? 'CH2' : 'CH1'}</div>

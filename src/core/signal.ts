@@ -12,8 +12,11 @@ export interface SignalParams {
   duration: number     // s
 }
 
-// Snap duration to a whole number of periods to avoid spectral leakage
-function snapDuration(duration: number, frequency: number, samplingRate: number) {
+// Snap duration to a whole number of periods to avoid spectral leakage. Exported (SIG-1) so the
+// Spectrum readout and tests can compute N — the exact FFT length — identically to generateSignal.
+// This is plumbing, NOT the protected leakage math: N lands every component on an integer bin only
+// when numPeriods·Fs/f is an integer (i.e. Fs/f is a ratio whose denominator divides numPeriods).
+export function snapDuration(duration: number, frequency: number, samplingRate: number) {
   const numPeriods = Math.max(1, Math.round(duration * frequency))
   return Math.round(numPeriods * samplingRate / frequency)
 }

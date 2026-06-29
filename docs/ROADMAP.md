@@ -204,7 +204,7 @@ experiments. Both touch `core/signal.ts`, so the 12-bit canary must be re-verifi
 
 | ID | Deliverable | Depends on | Status |
 |----|-------------|-----------|--------|
-| SIG-1 | **Settable ADC sample rate.** A user control for the acquisition Fs (drives the Spectrum and the scope capture path), enabling aliasing (sub-Nyquist), oversampling noise-reduction, and the Fs/N/bin-width relationship. Keep zero-leakage framing: `snapDuration` already rounds to whole periods, but verify exact harmonic-bin landing at each offered rate. | — | TODO |
+| SIG-1 | **Settable ADC sample rate.** A user control for the acquisition Fs (drives the Spectrum and the scope capture path), enabling aliasing (sub-Nyquist), oversampling noise-reduction, and the Fs/N/bin-width relationship. Keep zero-leakage framing: `snapDuration` already rounds to whole periods, but verify exact harmonic-bin landing at each offered rate. Decisions: **preset dropdown** (5/10/20/50/100/200 kSa/s, default 100), all three demos in scope. See `docs/specs/sig1-adc-sample-rate.md`. | — | DONE |
 | SIG-2 | **Optional DAC quantization** on the generator (W1/W2), modelling the M2K's 12-bit AWG DAC. **Default OFF** so the ADC bit-depth Learning Mode stays clean (an always-on DAC floor would muddy the ADC canary). When on, teaches "both ends quantize": DAC out, ADC in, sample rate the knob between. | SIG-1 | TODO |
 
 Notes:
