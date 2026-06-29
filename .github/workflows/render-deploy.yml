@@ -9,7 +9,21 @@ on:
     branches: [main]
 
 jobs:
+  # Gate: build + tests must pass before we deploy, so a broken push to main never reaches students.
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
   deploy:
+    needs: build-test            # deploy only runs if build-test succeeded
     runs-on: ubuntu-latest
     steps:
       - name: Trigger deploy of bridgem2k via Render API

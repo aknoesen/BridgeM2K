@@ -1,0 +1,20 @@
+name: CI
+
+# Build + test on pull requests. This is the status check to mark "required" if/when branch
+# protection is adopted (see docs/github-development.md item 5). Push-to-main is build-tested by the
+# deploy workflow's gate, so CI here runs on PRs only to avoid duplicate runs on main.
+on:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
