@@ -10,6 +10,22 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Next session: start here (updated 2026-06-28)
 
+**F-4 (per-part op-amp board packages) is DONE.** The breadboard no longer hardcodes the LMC662 for
+every op-amp — it drives the DIP footprint from the schematic op-amp's kit `part` via a new per-package
+model in `core/breadboard.ts`: `DipPkg` (`opamp-single` | `opamp-quad` | `lmc662` | `ina125`) +
+`DIP_DEFS` table (pin count, pin-function labels, V+/V− rail pins, used-amp signal pins) + `opampBoardPkg`/
+`opampBoardName`. **Step 0** removed **ADTL082 + AD8542** from the kit catalog (`core/opamps.ts` — they're
+breakout boards, not breadboard DIPs), leaving **5 kit op-amps** (OP27/37/97 single 8-DIP, OP482/484 quad
+14-DIP); off-kit/part-less op-amps fall back to the 8-pin LMC662 dual; INA125 stays a 16-DIP. The board
+render, the legend (a new **parametric `DipPinoutLegend`** replacing the hardcoded LMC662 SVG), and the
+equivalence Check (`pinNets`/`rails` per package) all follow the selected part. **Centerpiece verified
+live:** a default **OP484** boards as a **14-pin DIP labelled OP484** with the quad pinout (V+ pin 4 /
+V− pin 11), no "LMC662" anywhere; Check passes when wired (tested). `PlacedDip.kind`/expectation dips are
+now `DipPkg` (values `lmc662`/`ina125` unchanged, so old saved boards still deserialize). **No
+`core/signal.ts` change — 12-bit canary untouched.** Build clean; **144/144** tests (new F-4 board tests
++ updated `opamps.test.ts` to the 5-part catalog). D2 ("show one valid layout" hint) deferred to F-4b per
+andre. Full detail in the top log entry below. Next ROADMAP `TODO`: **KICAD-1** (stretch).
+
 **SIG-2 (optional DAC quantization) is DONE — Track I is fully built (SIG-1 + SIG-2).** The Spectrum
 Analyzer's Learning Mode now has a **"DAC model (W1/W2 output)" toggle + 4/8/12-bit selector**
 (default 12 = real M2K AWG), distinct from the ADC bit-depth control, modelling the AWG DAC as an

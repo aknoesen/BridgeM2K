@@ -7,9 +7,9 @@ import {
 } from './opamps'
 
 describe('catalog', () => {
-  it('has the 7 verified kit op-amps with the spec params', () => {
+  it('has the 5 verified kit op-amps with the spec params (F-4: BOB duals removed)', () => {
     expect(opampList().map((p) => p.kind)).toEqual([
-      'op27', 'op37', 'op97', 'op482', 'op484', 'adtl082', 'ad8542',
+      'op27', 'op37', 'op97', 'op482', 'op484',
     ])
     expect(getOpamp('op27').gbwHz).toBe(8e6)
     expect(getOpamp('op37').gbwHz).toBe(63e6)
@@ -18,12 +18,15 @@ describe('catalog', () => {
     expect(getOpamp('op484').outputHeadroom).toBeLessThan(0.1)
     expect(getOpamp('op27').railToRailOut).toBe(false)
     expect(getOpamp('op27').outputHeadroom).toBeGreaterThan(1)
-    expect(getOpamp('ad8542').supplyMax).toBe(5.5)
+    expect(getOpamp('op484').supplyMin).toBe(3)
+    // every kit op-amp is now a DIP (no BOB breakout parts remain)
+    expect(opampList().every((p) => p.package === '8-DIP' || p.package === '14-DIP')).toBe(true)
   })
 
   it('isKitOpamp distinguishes kit parts from off-kit', () => {
     expect(isKitOpamp('op484')).toBe(true)
-    expect(isKitOpamp('adtl082')).toBe(true)
+    expect(isKitOpamp('op27')).toBe(true)
+    expect(isKitOpamp('adtl082')).toBe(false) // removed in F-4
     expect(isKitOpamp('lmc662')).toBe(false)
     expect(isKitOpamp('not-a-part')).toBe(false)
   })

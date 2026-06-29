@@ -251,10 +251,11 @@ generator → circuit → scope/Bode loop, the breadboard transfer/verify, and t
 library are all implemented — closing the original "Signal Generator → circuit → Spectrum/
 Scope" goal. Diodes/LED/Zener, differential probes, undo/redo, copy/paste, and preset layouts
 are in. The op-amp is a selectable **real part from the ADALP2000 kit** (OP27, OP37, OP97, OP482,
-OP484, ADTL082, AD8542 — each a behavioural macromodel; default OP484), never a package-less
+OP484 — each a behavioural macromodel; default OP484), never a package-less
 "ideal" variant (see SCH-9 / `core/opamps.ts`). Its schematic symbol shows inP/inN/out with power
-implied (auto ±5 V in sim); on the breadboard it is an 8-pin DIP whose V+/V− must be wired to the
-rails (the board Check enforces this). Off-kit op-amps still simulate but show a "not in your parts
+implied (auto ±5 V in sim); on the breadboard it boards as its real DIP package (F-4: single 8-pin
+for OP27/37/97, quad 14-pin for OP482/484; the off-kit LMC662 fallback as an 8-pin dual) whose V+/V−
+must be wired to the rails (the board Check enforces this). Off-kit op-amps still simulate but show a "not in your parts
 kit" badge. Every part the twin offers is buildable; `docs/ROADMAP.md` is the phase-by-phase status
 of record.
 

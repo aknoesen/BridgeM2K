@@ -135,6 +135,71 @@ describe('breadboard DIP placement (F-3)', () => {
   })
 })
 
+describe('breadboard op-amp packages (F-4) — footprint follows the kit part', () => {
+  const holes = buildHoles()
+  const opSch = (part?: string): Schematic =>
+    ({ components: [{ id: 'U1', kind: 'opamp', gx: 10, gy: 4, ...(part ? { part } : {}) }], wires: [] })
+
+  it('OP484 (quad) boards as a 14-pin DIP named OP484, amp-A pins + rails V+ pin4 / V− pin11', () => {
+    const exp = schematicExpectation(opSch('op484'))
+    expect(exp.dips).toHaveLength(1)
+    const d = exp.dips[0]
+    expect(d.kind).toBe('opamp-quad')
+    expect(d.name).toBe('OP484')
+    expect(d.pinNets).toHaveLength(14)
+    expect(d.rails).toEqual({ vpos: 3, vneg: 10 })
+    expect(d.pinNets[0]).toBeDefined() // OUT A (pin 1)
+    expect(d.pinNets[1]).toBeDefined() // −IN A (pin 2)
+    expect(d.pinNets[2]).toBeDefined() // +IN A (pin 3)
+  })
+
+  it('OP27 (single) boards as an 8-pin DIP named OP27, rails V+ pin7 / V− pin4', () => {
+    const d = schematicExpectation(opSch('op27')).dips[0]
+    expect(d.kind).toBe('opamp-single')
+    expect(d.name).toBe('OP27')
+    expect(d.pinNets).toHaveLength(8)
+    expect(d.rails).toEqual({ vpos: 6, vneg: 3 })
+    expect(d.pinNets[5]).toBeDefined() // OUT (pin 6)
+    expect(d.pinNets[1]).toBeDefined() // −IN (pin 2)
+    expect(d.pinNets[2]).toBeDefined() // +IN (pin 3)
+  })
+
+  it('an off-kit / part-less op-amp falls back to the 8-pin LMC662 dual (no "LMC662" surprise for a kit part)', () => {
+    const d = schematicExpectation(opSch(undefined)).dips[0]
+    expect(d.kind).toBe('lmc662')
+    expect(d.name).toBe('LMC662')
+    expect(d.pinNets).toHaveLength(8)
+    expect(d.rails).toEqual({ vpos: 7, vneg: 3 })
+  })
+
+  it('dipPinHoles lays a 14-pin quad across 7 columns (pin4 = f8 V+, pin11 = e8 V−)', () => {
+    const pins = dipPinHoles('opamp-quad', 5)
+    expect(pins).toEqual(['f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'e11', 'e10', 'e9', 'e8', 'e7', 'e6', 'e5'])
+    expect(pins![3]).toBe('f8')   // pin 4 = V+
+    expect(pins![10]).toBe('e8')  // pin 11 = V−
+  })
+
+  it('centerpiece: a default OP484 boards as a 14-pin DIP and the Check passes when wired', () => {
+    const board: BoardLayout = {
+      parts: [], ports: [],
+      dips: [{ id: 'U1', kind: 'opamp-quad', col: 5 }],
+      jumpers: [{ a: 'f8', b: 'TN8' }, { a: 'e8', b: 'BP8' }], // pin4 V+→V+ rail, pin11 V−→V− rail
+    }
+    expect(checkEquivalence(opSch('op484'), board, holes).ok).toBe(true)
+  })
+
+  it('the OP484 board fails until V+ (pin 4) is wired to the rail', () => {
+    const board: BoardLayout = {
+      parts: [], ports: [],
+      dips: [{ id: 'U1', kind: 'opamp-quad', col: 5 }],
+      jumpers: [{ a: 'e8', b: 'BP8' }], // only V− wired
+    }
+    const r = checkEquivalence(opSch('op484'), board, holes)
+    expect(r.ok).toBe(false)
+    expect(r.message).toContain('V+')
+  })
+})
+
 describe('breadboard INA125 auxiliary straps (SCH-7, Lab 8 Fig 1)', () => {
   const holes = buildHoles()
   const sch: Schematic = { components: [{ id: 'U1', kind: 'ina125', gx: 10, gy: 4 }], wires: [] }

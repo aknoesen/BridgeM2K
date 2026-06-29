@@ -6,7 +6,7 @@ import { useMemo, useRef, useState, type Dispatch, type SetStateAction, type CSS
 import {
   buildHoles, boardNets, boardWidth, boardHeight, PAD, PITCH, CHANNEL_SLOT,
   schematicExpectation, checkEquivalence, type BoardLayout, type CheckResult,
-  dipPinHoles, dipCols, holeKey, DIP_TOP_ROW, DIP_BOT_ROW,
+  dipPinHoles, dipCols, holeKey, DIP_TOP_ROW, DIP_BOT_ROW, DIP_DEFS, type DipPkg,
   to92PinHoles, to92Legend, TO92_ROW,
   TERMINALS, type Terminal, POWER_WIRES, PORT_TERMINAL, unboardable,
 } from '../core/breadboard'
@@ -20,7 +20,7 @@ type Tool =
   | { kind: 'select' }
   | { kind: 'jumper' }
   | { kind: 'placePart'; id: string; partKind: SchKind }
-  | { kind: 'placeDip'; id: string; partKind: SchKind }
+  | { kind: 'placeDip'; id: string; partKind: DipPkg }
   | { kind: 'placeTransistor'; id: string; partKind: SchKind }
 
 const NET_COLORS = ['#f0a030', '#40c0e0', '#44dd88', '#e06fd0', '#d0d040', '#7a8cff', '#ff8855', '#55ddcc']
@@ -28,15 +28,48 @@ const NET_COLORS = ['#f0a030', '#40c0e0', '#44dd88', '#e06fd0', '#d0d040', '#7a8
 // can be crammed to ~4 holes at the tightest. Enforce that floor so legs can't sit unrealistically
 // close (e.g. adjacent holes). Pitch is 0.1" per hole.
 const MIN_RESISTOR_HOLES = 4
-// DIP function per pin (1-based), in dipPinHoles order. Pin 1 sits at the notch.
-const LMC662_FN = ['OUT A', '−IN A', '+IN A', 'V−', '+IN B', '−IN B', 'OUT B', 'V+']
-const INA125_FN = ['V+', 'SLEEP', 'V−', 'VREFOUT', 'IAREF', 'VIN−', 'VIN+', 'RG', 'RG', 'VO', 'Sense', 'VREFCOM', 'VREFBG', 'VREF2.5', 'VREF5', 'VREF10']
-const DIP_FN: Record<string, string[]> = { lmc662: LMC662_FN, ina125: INA125_FN }
-const DIP_NAME: Record<string, string> = { lmc662: 'LMC662', ina125: 'INA125' }
+// DIP pin functions / names / rail pins now live in core (DIP_DEFS, keyed by DipPkg) so the board
+// render and the equivalence check share one source of truth (F-4).
 // TO-92 discrete transistors (SCH-8). Leg order matches to92Legend / the schematic terminal order.
 const TR_NAME: Record<string, string> = { bjt: 'BJT', mosfet: 'MOSFET' }
-// 0-based pin indices of the V+/V− pins per DIP (for colouring the power pins).
-const DIP_RAILS: Record<string, { vpos: number; vneg: number }> = { lmc662: { vpos: 7, vneg: 3 }, ina125: { vpos: 0, vneg: 2 } }
+
+// F-4: a parametric DIP-pinout legend driven by DIP_DEFS, so any op-amp package (8-pin single,
+// 8-pin dual, 14-pin quad) renders correctly with the right name and pin functions — replacing the
+// old hardcoded LMC662 SVG. Standard DIP numbering: pin 1 top-left, down the left to pin n/2, then
+// pin n/2+1 bottom-right up to pin n; notch at the top. V+/V− pins are colour-coded.
+function DipPinoutLegend({ pkg, name }: { pkg: DipPkg; name: string }) {
+  const def = DIP_DEFS[pkg]
+  const n = def.pins, half = n / 2
+  const rowH = 20, bodyTop = 20, bodyX = 88, bodyW = 30
+  const bodyH = half * rowH + 8
+  const W = 200, H = bodyTop + bodyH + 16
+  const colOf = (idx0: number) => def.rails && idx0 === def.rails.vpos ? '#e04040'
+    : def.rails && idx0 === def.rails.vneg ? '#4a9eff' : '#cfcfcf'
+  const rowY = (j: number) => bodyTop + 16 + j * rowH
+  const cx = bodyX + bodyW / 2
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" role="img"
+      aria-label={`${name} ${n}-pin DIP pinout`} style={{ display: 'block', width: '100%', height: Math.min(260, H), flexShrink: 0, margin: '4px 0' }}>
+      <rect x={bodyX} y={bodyTop} width={bodyW} height={bodyH} rx={4} fill="#1b1b1f" stroke="#888" strokeWidth={1.5} />
+      <path d={`M ${cx - 7} ${bodyTop} a 7 7 0 0 0 14 0`} fill="#0c0d0f" stroke="#888" strokeWidth={1.5} />
+      <text x={cx} y={bodyTop + bodyH / 2 + 3} fontSize={8} fill="#9aa0a6" textAnchor="middle"
+        transform={`rotate(90 ${cx} ${bodyTop + bodyH / 2})`}>{name}</text>
+      {Array.from({ length: half }, (_, j) => {
+        const pL = j + 1, pR = n - j, y = rowY(j)            // left top→bottom 1..half; right top→bottom n..half+1
+        return (
+          <g key={j}>
+            <line x1={bodyX - 10} y1={y} x2={bodyX} y2={y} stroke="#888" strokeWidth={1.5} />
+            <text x={bodyX - 4} y={y - 2} fontSize={8} fontWeight={800} fill={colOf(pL - 1)} textAnchor="end">{pL}</text>
+            <text x={bodyX - 14} y={y + 3} fontSize={8} fill="var(--text-secondary)" textAnchor="end">{def.fn[pL - 1]}</text>
+            <line x1={bodyX + bodyW} y1={y} x2={bodyX + bodyW + 10} y2={y} stroke="#888" strokeWidth={1.5} />
+            <text x={bodyX + bodyW + 4} y={y - 2} fontSize={8} fontWeight={800} fill={colOf(pR - 1)} textAnchor="start">{pR}</text>
+            <text x={bodyX + bodyW + 14} y={y + 3} fontSize={8} fill="var(--text-secondary)" textAnchor="start">{def.fn[pR - 1]}</text>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
 
 interface Props {
   schematic: Schematic
@@ -398,6 +431,9 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
             {(board.dips ?? []).map((d) => {
               const pins = dipPinHoles(d.kind, d.col); if (!pins) return null
               const n = dipCols(d.kind)
+              const def = DIP_DEFS[d.kind]
+              // Display the real part name (from the current schematic), falling back to the package.
+              const dipName = exp.dips.find((e) => e.id === d.id)?.name ?? d.name ?? def?.name ?? d.kind
               const tl = pos(holeKey(DIP_TOP_ROW, d.col)), br = pos(holeKey(DIP_BOT_ROW, d.col + n - 1))
               const bx = tl.x - 7, by = tl.y - 7, bw = (br.x - tl.x) + 14, bh = (br.y - tl.y) + 14
               return (
@@ -411,18 +447,18 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
                     const col = (showNets && activeColor.get(net)) || '#cfcfcf'
                     const isBottom = i < n           // pins 1..n on the bottom row, n+1..2n on top
                     const numY = isBottom ? h.y + 12 : h.y - 7
-                    const rails = DIP_RAILS[d.kind]
+                    const rails = def?.rails
                     const numCol = rails && i === rails.vpos ? '#e04040' : rails && i === rails.vneg ? '#4a9eff' : '#9aa0a6'
                     return (
                       <g key={i}>
                         <circle cx={h.x} cy={h.y} r={3.2} fill={col} stroke="#000" strokeWidth={0.5}>
-                          <title>{`pin ${i + 1}: ${(DIP_FN[d.kind] ?? [])[i] ?? ''}`}</title>
+                          <title>{`pin ${i + 1}: ${(def?.fn ?? [])[i] ?? ''}`}</title>
                         </circle>
                         <text x={h.x} y={numY} fontSize={9} fontWeight={800} fill={numCol} textAnchor="middle">{i + 1}</text>
                       </g>
                     )
                   })}
-                  <text x={(bx + bx + bw) / 2} y={by + bh / 2 + 3} fontSize={8} fill="#cfcfcf" textAnchor="middle">{d.id} · {DIP_NAME[d.kind] ?? d.kind}</text>
+                  <text x={(bx + bx + bw) / 2} y={by + bh / 2 + 3} fontSize={8} fill="#cfcfcf" textAnchor="middle">{d.id} · {dipName}</text>
                 </g>
               )
             })}
@@ -522,46 +558,25 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
           </div>
         )}
 
-        {exp.dips.some((d) => d.kind === 'lmc662') && (
-          <>
-            <div className="section-title">LMC662 pinout</div>
-            <svg viewBox="0 0 240 150" preserveAspectRatio="xMidYMid meet" role="img"
-              aria-label="LMC662 8-pin DIP pinout" style={{ display: 'block', width: '100%', height: 132, flexShrink: 0, margin: '4px 0' }}>
-              {/* top pins 8,7,6,5 (left→right); bottom pins 1,2,3,4 — matches the chip on the board */}
-              {([['V+', 8], ['OUT B', 7], ['−IN B', 6], ['+IN B', 5]] as const).map(([fn, p], j) => {
-                const x = 54 + j * 44
-                const c = p === 8 ? '#e04040' : '#cfcfcf'
-                return (
-                  <g key={p}>
-                    <line x1={x} y1={48} x2={x} y2={38} stroke="#888" strokeWidth={1.5} />
-                    <circle cx={x} cy={38} r={3} fill={c} />
-                    <text x={x} y={28} fontSize={11} fontWeight={800} fill={c} textAnchor="middle">{p}</text>
-                    <text x={x} y={17} fontSize={9} fill="var(--text-secondary)" textAnchor="middle">{fn}</text>
-                  </g>
-                )
-              })}
-              <rect x={36} y={48} width={168} height={54} rx={4} fill="#1b1b1f" stroke="#888" strokeWidth={1.5} />
-              <path d={`M ${36} ${68} a 7 7 0 0 0 0 14`} fill="#0c0d0f" stroke="#888" strokeWidth={1.5} />
-              <text x={120} y={79} fontSize={10} fill="#9aa0a6" textAnchor="middle">LMC662</text>
-              {([['OUT A', 1], ['−IN A', 2], ['+IN A', 3], ['V−', 4]] as const).map(([fn, p], j) => {
-                const x = 54 + j * 44
-                const c = p === 4 ? '#4a9eff' : '#cfcfcf'
-                return (
-                  <g key={p}>
-                    <line x1={x} y1={102} x2={x} y2={112} stroke="#888" strokeWidth={1.5} />
-                    <circle cx={x} cy={112} r={3} fill={c} />
-                    <text x={x} y={126} fontSize={11} fontWeight={800} fill={c} textAnchor="middle">{p}</text>
-                    <text x={x} y={138} fontSize={9} fill="var(--text-secondary)" textAnchor="middle">{fn}</text>
-                  </g>
-                )
-              })}
-            </svg>
-            <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6, marginTop: 2 }}>
-              Notch / pin 1 at the lower-left — same orientation as the chip on the board. Your op-amp uses
-              <b> section A</b>: +IN A (3), −IN A (2), OUT A (1); power <b style={{ color: '#e04040' }}>V+</b> (8) and <b style={{ color: '#4a9eff' }}>V−</b> (4).
-            </div>
-          </>
-        )}
+        {(['opamp-single', 'opamp-quad', 'lmc662'] as const)
+          .filter((pkg) => exp.dips.some((d) => d.kind === pkg))
+          .map((pkg) => {
+            const def = DIP_DEFS[pkg]
+            const a = def.amp!, r = def.rails!
+            const nm = exp.dips.find((d) => d.kind === pkg)?.name ?? def.name
+            return (
+              <div key={pkg}>
+                <div className="section-title">{nm} pinout ({def.pins}-pin DIP)</div>
+                <DipPinoutLegend pkg={pkg} name={nm} />
+                <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6, marginTop: 2 }}>
+                  Notch / pin 1 at the top — same orientation as the chip on the board. Your op-amp uses
+                  <b> amplifier A</b>: +IN ({a.inP + 1}), −IN ({a.inN + 1}), OUT ({a.out + 1}); power
+                  <b style={{ color: '#e04040' }}> V+</b> ({r.vpos + 1}) and
+                  <b style={{ color: '#4a9eff' }}> V−</b> ({r.vneg + 1}). Other amplifiers in the package are unused.
+                </div>
+              </div>
+            )
+          })}
 
         {exp.dips.some((d) => d.kind === 'ina125') && (
           <>

@@ -11,13 +11,15 @@
 // params are in SI base units (slewRate kept in V/µs per the interface). Electrical params verified
 // from datasheets — see docs/specs/SCH-9-spec.md.
 
+// F-4: ADTL082 + AD8542 removed — they ship as breakout boards (BOB), not breadboard DIPs, so they
+// are not part of the kit op-amp library the twin offers. Every remaining kit op-amp is a DIP.
 export type OpampKind =
-  | 'op27' | 'op37' | 'op97' | 'op482' | 'op484' | 'adtl082' | 'ad8542'
+  | 'op27' | 'op37' | 'op97' | 'op482' | 'op484'
 
 export interface OpampPart {
   kind: OpampKind
   name: string
-  package: '8-DIP' | '14-DIP' | 'BOB'
+  package: '8-DIP' | '14-DIP'
   channels: 1 | 2 | 4
   gbwHz: number
   slewRate: number        // V/µs
@@ -56,16 +58,6 @@ export const KIT_OPAMPS: Record<OpampKind, OpampPart> = {
     kind: 'op484', name: 'OP484', package: '14-DIP', channels: 4, gbwHz: 4e6, slewRate: 4,
     vosTyp: 65e-6, supplyMin: 3, supplyMax: 36, railToRailIn: true, railToRailOut: true,
     outputHeadroom: 0.02, count: 1, note: 'Precision rail-to-rail I/O; works to +1.5 V single supply',
-  },
-  adtl082: {
-    kind: 'adtl082', name: 'ADTL082', package: 'BOB', channels: 2, gbwHz: 5e6, slewRate: 20,
-    vosTyp: 3e-3, supplyMin: 10, supplyMax: 36, railToRailIn: false, railToRailOut: false,
-    outputHeadroom: 2.0, count: 1, note: 'JFET input, TL082-class; output swings to ~2 V of each rail',
-  },
-  ad8542: {
-    kind: 'ad8542', name: 'AD8542', package: 'BOB', channels: 2, gbwHz: 1e6, slewRate: 0.92,
-    vosTyp: 1e-3, supplyMin: 2.7, supplyMax: 5.5, railToRailIn: true, railToRailOut: true,
-    outputHeadroom: 0.02, count: 1, note: 'CMOS rail-to-rail I/O; single-supply 2.7–5.5 V only',
   },
 }
 

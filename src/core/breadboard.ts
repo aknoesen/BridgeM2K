@@ -6,6 +6,7 @@
 // See docs/specs/breadboard.md.
 
 import { computeNets, terminalsOf, type Schematic, type SchKind } from './schematic'
+import { getOpamp, isKitOpamp } from './opamps'
 
 export const COLS = 30
 export const PITCH = 18   // px between adjacent holes
@@ -208,22 +209,78 @@ export const POWER_WIRES: PowerWire[] = (() => {
 // DIP/IC parts placed on the board (F-3). Unlike a 2-pin part, every pin is its own net and the
 // body must straddle the center channel: pins sit in the two channel-adjacent term rows (e and f),
 // so each pin lands in its own isolated terminal column.
+// Schematic kinds that ARE their own DIP package directly (legacy explicit parts whose pins are all
+// schematic terminals). The abstract `opamp` kind is handled separately (its package comes from the
+// selected kit `part`); `ina125` is also handled in its own branch.
 export const DIP_KINDS = new Set<SchKind>(['lmc662'])
 export const DIP_TOP_ROW: Row = 'e' // top-bank row adjacent to the channel
 export const DIP_BOT_ROW: Row = 'f' // bottom-bank row adjacent to the channel
 
-// Columns a DIP spans (pins split evenly across the two rows). LMC662 = 8 pins → 4 columns;
-// INA125 = 16 pins → 8 columns.
-export function dipCols(kind: SchKind): number {
-  return kind === 'lmc662' ? 4 : kind === 'ina125' ? 8 : 0
+// ── F-4: per-package DIP model ───────────────────────────────────────────────────
+// The board footprint is driven by the part's package, not a hardcoded LMC662. A `DipPkg` names a
+// physical DIP footprint; the schematic op-amp maps to one via its kit `part` (opampBoardPkg). The
+// values 'lmc662' / 'ina125' deliberately match the legacy SchKind strings so older saved boards
+// (PlacedDip.kind = 'lmc662' / 'ina125') still deserialize.
+export type DipPkg = 'opamp-single' | 'opamp-quad' | 'lmc662' | 'ina125'
+
+export interface DipDef {
+  pins: number            // total pin count (even)
+  name: string            // default display name (op-amps override with the real part name)
+  fn: string[]            // pin-function labels, 1-based (index 0 = pin 1); length === pins
+  rails?: { vpos: number; vneg: number }            // 0-based V+/V− pin indices (Check + colouring)
+  amp?: { out: number; inN: number; inP: number }   // used-amp (A) signal pins, 0-based (op-amps)
+}
+
+// Standard pinouts (1-based → 0-based index). Single/quad op-amp use amp A; rails come via the board
+// power rails. LMC662 is the off-kit 8-pin dual fallback; INA125 keeps its datasheet pinout.
+export const DIP_DEFS: Record<DipPkg, DipDef> = {
+  'opamp-single': {
+    pins: 8, name: 'Op-amp (8-DIP)',
+    fn: ['NC', '−IN', '+IN', 'V−', 'NC', 'OUT', 'V+', 'NC'],
+    rails: { vpos: 6, vneg: 3 }, amp: { out: 5, inN: 1, inP: 2 },
+  },
+  'opamp-quad': {
+    pins: 14, name: 'Op-amp (14-DIP)',
+    fn: ['OUT A', '−IN A', '+IN A', 'V+', '+IN B', '−IN B', 'OUT B', 'OUT C', '−IN C', '+IN C', 'V−', '+IN D', '−IN D', 'OUT D'],
+    rails: { vpos: 3, vneg: 10 }, amp: { out: 0, inN: 1, inP: 2 },
+  },
+  'lmc662': {
+    pins: 8, name: 'LMC662',
+    fn: ['OUT A', '−IN A', '+IN A', 'V−', '+IN B', '−IN B', 'OUT B', 'V+'],
+    rails: { vpos: 7, vneg: 3 }, amp: { out: 0, inN: 1, inP: 2 },
+  },
+  'ina125': {
+    pins: 16, name: 'INA125',
+    fn: ['V+', 'SLEEP', 'V−', 'VREFOUT', 'IAREF', 'VIN−', 'VIN+', 'RG', 'RG', 'VO', 'Sense', 'VREFCOM', 'VREFBG', 'VREF2.5', 'VREF5', 'VREF10'],
+    rails: { vpos: 0, vneg: 2 },
+  },
+}
+
+// Which board footprint a schematic op-amp gets, from its kit `part`: single 8-DIP (OP27/37/97),
+// quad 14-DIP (OP482/484), or the off-kit 8-pin dual fallback (no/unknown part → LMC662 behaviour).
+export function opampBoardPkg(part?: string): DipPkg {
+  if (part && isKitOpamp(part)) {
+    const channels = getOpamp(part).channels
+    if (channels === 1) return 'opamp-single'
+    if (channels === 4) return 'opamp-quad'
+  }
+  return 'lmc662'
+}
+// Display name for a boarded op-amp: the real kit part (OP484…) or the off-kit fallback name.
+export function opampBoardName(part?: string): string {
+  return part && isKitOpamp(part) ? getOpamp(part).name : 'LMC662'
+}
+
+// Columns a DIP spans (pins split evenly across the two rows): 8-pin → 4, 14-pin → 7, 16-pin → 8.
+export function dipCols(pkg: DipPkg): number {
+  return DIP_DEFS[pkg].pins / 2
 }
 
 // Hole keys for a DIP whose top-left pin sits at (DIP_TOP_ROW, col), ordered to match the schematic
-// terminal order from terminalsOf (LMC662: OUTA,-A,+A,V-,+B,-B,OUTB,V+ = pins 1..8). Convention:
-// pin 1 bottom-left, pins 1→n along the bottom row L→R, pins n+1→2n along the top row R→L
-// (notch faces left). Returns null if the kind is not a DIP or it would overrun the board.
-export function dipPinHoles(kind: SchKind, col: number): string[] | null {
-  const n = dipCols(kind)
+// terminal order / DIP_DEFS pin numbering. Convention: pin 1 bottom-left, pins 1→n along the bottom
+// row L→R, pins n+1→2n along the top row R→L (notch faces left). Null if it would overrun the board.
+export function dipPinHoles(pkg: DipPkg, col: number): string[] | null {
+  const n = dipCols(pkg)
   if (n === 0 || col < 1 || col + n - 1 > COLS) return null
   const bottom: string[] = [], top: string[] = []
   for (let i = 0; i < n; i++) {
@@ -254,8 +311,9 @@ export function to92Legend(kind: SchKind): string[] {
 
 export interface PlacedPart { id: string; kind: SchKind; value?: number; aHole: string; bHole: string }
 export interface PlacedPort { port: string; hole: string }
-// A placed DIP is anchored by its top-left pin column; pin holes derive via dipPinHoles().
-export interface PlacedDip { id: string; kind: SchKind; col: number }
+// A placed DIP is anchored by its top-left pin column; pin holes derive via dipPinHoles(). `kind` is
+// the board DIP package (F-4), not the schematic kind. `name` is the display label (the real part).
+export interface PlacedDip { id: string; kind: DipPkg; col: number; name?: string }
 // A placed TO-92 transistor anchored by its left leg column; leg holes derive via to92PinHoles().
 export interface PlacedTransistor { id: string; kind: SchKind; col: number }
 export interface BoardLayout { parts: PlacedPart[]; jumpers: Jumper[]; ports: PlacedPort[]; dips?: PlacedDip[]; transistors?: PlacedTransistor[] }
@@ -272,7 +330,7 @@ export interface SchematicExpectation {
   // the INA125's reference and sense straps). `pin`/`to` are 0-based pin indices; `to` may also be
   // a rail name. `label` is the student-facing hint shown when the strap is missing.
   dips: {
-    id: string; kind: SchKind; pinNets: (string | undefined)[]
+    id: string; kind: DipPkg; name?: string; pinNets: (string | undefined)[]
     rails?: { vpos: number; vneg: number }
     straps?: { pin: number; to: number | 'V+' | 'V-' | 'GND'; label: string }[]
   }[]
@@ -294,14 +352,21 @@ export function schematicExpectation(s: Schematic): SchematicExpectation {
     } else if (TO92_KINDS.has(c.kind)) {
       transistors.push({ id: c.id, kind: c.kind, pinNets: ts.map((t) => netOf(t.gx, t.gy)) })
     } else if (DIP_KINDS.has(c.kind)) {
-      dips.push({ id: c.id, kind: c.kind, pinNets: ts.map((t) => netOf(t.gx, t.gy)) })
+      // Legacy explicit LMC662 dual: all 8 terminals (incl. V+/V−) are schematic pins, no rail anchor.
+      dips.push({ id: c.id, kind: 'lmc662', name: DIP_DEFS.lmc662.name, pinNets: ts.map((t) => netOf(t.gx, t.gy)) })
     } else if (c.kind === 'opamp') {
-      // One LMC662 section on the schematic → an 8-pin DIP on the board. Map its signal pins to the
-      // DIP pinout (1=OUTA,2=-A,3=+A,8=V+,4=V-); pins 5-7 (section B) are unused; V+/V- come via the
-      // rails, not the schematic.
+      // F-4: the board footprint follows the selected kit part (single 8-DIP / quad 14-DIP / off-kit
+      // 8-pin dual), not a hardcoded LMC662. Map the used amp (A) signal pins to that package's pinout;
+      // V+/V− come via the board rails, the rest are unused.
+      const pkg = opampBoardPkg(c.part)
+      const def = DIP_DEFS[pkg]
+      const a = def.amp!
       const byName = new Map(ts.map((t) => [t.name, netOf(t.gx, t.gy)]))
-      const pinNets = [byName.get('out'), byName.get('inN'), byName.get('inP'), undefined, undefined, undefined, undefined, undefined]
-      dips.push({ id: c.id, kind: 'lmc662', pinNets, rails: { vpos: 7, vneg: 3 } })
+      const pinNets: (string | undefined)[] = new Array(def.pins).fill(undefined)
+      pinNets[a.out] = byName.get('out')
+      pinNets[a.inN] = byName.get('inN')
+      pinNets[a.inP] = byName.get('inP')
+      dips.push({ id: c.id, kind: pkg, name: opampBoardName(c.part), pinNets, rails: def.rails })
     } else if (c.kind === 'ina125') {
       // INA125 → 16-pin DIP. Map the in-amp's signal pins to the datasheet pinout (1-based):
       // 6 VIN−, 7 VIN+, 8 RG, 9 RG, 10 VO; V+ (1) / V− (3) via the rails. The reference (IAref,
@@ -316,7 +381,7 @@ export function schematicExpectation(s: Schematic): SchematicExpectation {
       pinNets[8] = byName.get('rg2')   // pin 9
       pinNets[9] = byName.get('out')   // pin 10
       dips.push({
-        id: c.id, kind: 'ina125', pinNets,
+        id: c.id, kind: 'ina125', name: DIP_DEFS.ina125.name, pinNets,
         rails: { vpos: 0, vneg: 2 },     // V+ pin1, V− pin3
         straps: [
           { pin: 1, to: 'V+', label: 'SLEEP (pin 2) → V+ rail (else the device stays in shutdown)' },
