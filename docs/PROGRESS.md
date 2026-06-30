@@ -10,6 +10,21 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Next session: start here (updated 2026-06-28)
 
+**Photodiode part added (BPW 34) — ad-hoc, andre 2026-06-30; not a ROADMAP phase.** A new
+`'photodiode'` `SchKind` placeable from the editor palette ("Photo") and convertible via the
+diode Type dropdown (Diode/LED/Zener/Photodiode). It reuses the diode SPICE path: `core/netlist.ts`
+`Diode` gained `cj0` (→ `CJO=` in the `.model`) and `iphoto` (→ a **parallel DC current source
+`Iph… cathode anode`** so the anode sources photocurrent — correct anode-positive Voc / reverse Isc
+polarity; DC-only so `.ac` Bode is untouched). `toCircuit` (in `core/schematic.ts`) maps the part to a
+silicon PIN diode with **datasheet-faithful basic params**: IS=1e-10 (≈0.35 V Voc at the 80 µA
+short-circuit current), N=1, RS=10, BV=32 V (max reverse), CJO=72 pF (VR=0), and `iphoto = value`.
+The **illumination knob is `value` = photocurrent in amperes** (`UNIT` 'A'; sensitivity 80 nA/lx →
+1000 lx ≈ 80 µA, the default), with a live-tune range 1 nA–1 mA (`core/units.ts`). Boards as a 2-pin
+part (`PLACEABLE_KINDS` in `core/breadboard.ts`); editor symbol is a diode with two arrows pointing
+**in**. **No `core/signal.ts` change — 12-bit canary untouched.** Build clean (`tsc`+vite); **147/147**
+tests (3 new photodiode tests in `netlist.test.ts`: CJO+Iph emission, Iph omitted when dark, and an
+`.op` sim confirming V(a) ≈ Iph·R, anode-positive). Not yet committed at time of writing.
+
 **F-4 (per-part op-amp board packages) is DONE.** The breadboard no longer hardcodes the LMC662 for
 every op-amp — it drives the DIP footprint from the schematic op-amp's kit `part` via a new per-package
 model in `core/breadboard.ts`: `DipPkg` (`opamp-single` | `opamp-quad` | `lmc662` | `ina125`) +

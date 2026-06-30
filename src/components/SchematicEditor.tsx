@@ -29,6 +29,7 @@ const TOOLS: { tool: Tool; label: string }[] = [
   { tool: 'diode', label: 'Diode' },
   { tool: 'led', label: 'LED' },
   { tool: 'zener', label: 'Zener' },
+  { tool: 'photodiode', label: 'Photo' },
   { tool: 'bjt', label: 'BJT' },
   { tool: 'mosfet', label: 'MOSFET' },
   { tool: 'opamp', label: 'Op-amp' },
@@ -52,7 +53,7 @@ const KIT_PASSIVE = new Set<SchKind>(['resistor', 'capacitor', 'inductor'])
 
 const DEFAULT_VALUE: Partial<Record<SchKind, number>> = {
   resistor: 1000, capacitor: 100e-9, inductor: 1e-3, dcrail: 5, vplus: 5, vminus: -5,
-  led: 2.0, zener: 3.3,
+  led: 2.0, zener: 3.3, photodiode: 80e-6,
 }
 
 // Default ADALP2000 part placed for a new transistor / op-amp (overridable in the Selected panel).
@@ -477,12 +478,12 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
     setSch((s) => ({ ...s, components: s.components.map((c) => c.id === sel.id ? { ...c, value: v } : c) }))
   }
 
-  // Convert a placed diode between plain / LED / Zener; reset value to the new type's sensible
-  // default (LED Vf 2 V, Zener BV 3.3 V; plain diode has no value).
-  function setSelDiodeKind(k: 'diode' | 'led' | 'zener') {
+  // Convert a placed diode between plain / LED / Zener / Photodiode; reset value to the new type's
+  // sensible default (LED Vf 2 V, Zener BV 3.3 V, Photodiode 80 µA; plain diode has no value).
+  function setSelDiodeKind(k: 'diode' | 'led' | 'zener' | 'photodiode') {
     if (!sel) return
     snapshot()
-    const value = k === 'led' ? 2.0 : k === 'zener' ? 3.3 : undefined
+    const value = k === 'led' ? 2.0 : k === 'zener' ? 3.3 : k === 'photodiode' ? 80e-6 : undefined
     setSch((s) => ({ ...s, components: s.components.map((c) => c.id === sel.id ? { ...c, kind: k, value } : c) }))
   }
 
@@ -731,13 +732,14 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
                 onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
                 style={{ width: 80 }} />
             </div>
-            {(sel.kind === 'diode' || sel.kind === 'led' || sel.kind === 'zener') && (
+            {(sel.kind === 'diode' || sel.kind === 'led' || sel.kind === 'zener' || sel.kind === 'photodiode') && (
               <div className="control-row-inline">
                 <label>Type</label>
-                <select value={sel.kind} onChange={(e) => setSelDiodeKind(e.target.value as 'diode' | 'led' | 'zener')} style={{ width: 150 }}>
+                <select value={sel.kind} onChange={(e) => setSelDiodeKind(e.target.value as 'diode' | 'led' | 'zener' | 'photodiode')} style={{ width: 150 }}>
                   <option value="diode">Diode (silicon)</option>
                   <option value="led">LED (set Vf)</option>
                   <option value="zener">Zener (set BV)</option>
+                  <option value="photodiode">Photodiode (set Iₚ)</option>
                 </select>
               </div>
             )}
@@ -997,6 +999,24 @@ function renderSymbol(c: SchComponent, px: (g: number) => number, selected: bool
         <line x1={cx + 5} y1={y + 9} x2={cx + 9} y2={y + 9} stroke={stroke} strokeWidth={sw} />
         <line x1={cx + 5} y1={y} x2={x2} y2={y} stroke={stroke} strokeWidth={sw} />
         {upright(cx, y - 15, <text x={cx} y={y - 15} fill="var(--text-secondary)" fontSize={9} textAnchor="middle">{c.id}</text>)}
+      </g>
+    )
+  } else if (c.kind === 'photodiode') {
+    const x1 = ax, x2 = ax + G(2), y = ay, cx = ax + G(1)
+    inner = (
+      <g>
+        <line x1={x1} y1={y} x2={cx - 7} y2={y} stroke={stroke} strokeWidth={sw} />
+        <polygon points={`${cx - 7},${y - 9} ${cx - 7},${y + 9} ${cx + 5},${y}`} fill={stroke} stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />
+        <line x1={cx + 5} y1={y - 9} x2={cx + 5} y2={y + 9} stroke={stroke} strokeWidth={sw} />
+        <line x1={cx + 5} y1={y} x2={x2} y2={y} stroke={stroke} strokeWidth={sw} />
+        {/* two arrows pointing IN (incoming light) — the photodiode convention, opposite the LED */}
+        <line x1={cx + 6} y1={y - 19} x2={cx - 1} y2={y - 11} stroke={stroke} strokeWidth={1.3} />
+        <line x1={cx - 1} y1={y - 11} x2={cx + 2.5} y2={y - 10} stroke={stroke} strokeWidth={1.3} />
+        <line x1={cx - 1} y1={y - 11} x2={cx} y2={y - 14.5} stroke={stroke} strokeWidth={1.3} />
+        <line x1={cx + 12} y1={y - 18} x2={cx + 5} y2={y - 10} stroke={stroke} strokeWidth={1.3} />
+        <line x1={cx + 5} y1={y - 10} x2={cx + 8.5} y2={y - 9} stroke={stroke} strokeWidth={1.3} />
+        <line x1={cx + 5} y1={y - 10} x2={cx + 6} y2={y - 13.5} stroke={stroke} strokeWidth={1.3} />
+        {upright(cx, y + 18, <text x={cx} y={y + 18} fill="var(--text-secondary)" fontSize={9} textAnchor="middle">{c.id}</text>)}
       </g>
     )
   } else if (c.kind === 'bjt') {

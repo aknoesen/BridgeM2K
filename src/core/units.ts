@@ -6,6 +6,7 @@ import type { SchKind } from './schematic'
 export const UNIT: Partial<Record<SchKind, string>> = {
   resistor: 'Ω', capacitor: 'F', inductor: 'H', dcrail: 'V',
   led: 'V', zener: 'V', // led = forward voltage Vf; zener = breakdown voltage BV
+  photodiode: 'A', // photocurrent (illumination): 80 nA/lx, so 1000 lx ≈ 80 µA
 }
 
 // Log range per filter component so dragging a tune slider spans decades smoothly.
@@ -13,6 +14,7 @@ export const TUNE_RANGE: Partial<Record<SchKind, [number, number]>> = {
   resistor: [1, 1e6],
   capacitor: [1e-12, 1e-5],
   inductor: [1e-6, 1],
+  photodiode: [1e-9, 1e-3], // dark (≈nA) → bright sun (≈mA); drag illumination live
 }
 
 // Parse engineering notation like "1k", "159n", "4.7u" → number.

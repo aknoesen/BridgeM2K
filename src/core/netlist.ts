@@ -115,6 +115,8 @@ export interface Ground {
 
 // Junction diode. nodes = [anode, cathode]. Each diode emits its own .model so an LED (higher Vf
 // via a smaller IS) or a Zener (low reverse breakdown BV) can differ. Defaults = generic silicon.
+// A photodiode (BPW 34) reuses this kind: `iphoto` adds a parallel current source modelling
+// illumination, and `cj0` sets the junction capacitance.
 export interface Diode {
   kind: 'diode'
   id: string
@@ -123,6 +125,8 @@ export interface Diode {
   n?: number  // ideality factor
   rs?: number // series resistance
   bv?: number // reverse breakdown voltage (Zener)
+  cj0?: number // zero-bias junction capacitance (F) — photodiode/LED reverse-recovery & AC load
+  iphoto?: number // photodiode illumination current (A); a parallel source injected cathode→anode
 }
 
 // Bipolar junction transistor (SCH-8). nodes = [collector, base, emitter]; `polarity` sets the
@@ -386,8 +390,14 @@ export function buildNetlist(circuit: Circuit, analysis: Analysis): string {
         const is = (c.is ?? 2.52e-9).toExponential(4)
         const nn = c.n ?? 1.752, rs = c.rs ?? 0.568, bv = c.bv ?? 100
         const m = `DM${c.id}`
+        const cjo = c.cj0 !== undefined ? ` CJO=${c.cj0.toExponential(4)}` : ''
         lines.push(`D${c.id} ${n(c.nodes[0])} ${n(c.nodes[1])} ${m}`)
-        lines.push(`.model ${m} D(IS=${is} N=${nn} RS=${rs} BV=${bv} IBV=0.1u)`)
+        lines.push(`.model ${m} D(IS=${is} N=${nn} RS=${rs} BV=${bv} IBV=0.1u${cjo})`)
+        // Photodiode illumination: a DC current source in parallel injects the photocurrent from
+        // cathode (n+) to anode (n-) inside the source, so it sources current out of the anode
+        // externally — an anode-positive open-circuit voltage and a reverse short-circuit current,
+        // exactly as an illuminated photodiode behaves. DC only, so it leaves .ac sweeps untouched.
+        if (c.iphoto) lines.push(`Iph${c.id} ${n(c.nodes[1])} ${n(c.nodes[0])} DC ${fmt(c.iphoto)}`)
         break
       }
       case 'bjt': {

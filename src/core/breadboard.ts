@@ -128,7 +128,7 @@ export const PORT_NAME: Partial<Record<SchKind, string>> = {
   vplus: 'V+', vminus: 'V-', ground: 'GND',
 }
 // 2-pin parts a student places on the board (F-2): passives plus the 2-terminal semiconductors.
-export const PLACEABLE_KINDS = new Set<SchKind>(['resistor', 'capacitor', 'inductor', 'diode', 'led', 'zener'])
+export const PLACEABLE_KINDS = new Set<SchKind>(['resistor', 'capacitor', 'inductor', 'diode', 'led', 'zener', 'photodiode'])
 
 // Kinds the board cannot lay out. Every part now has a package (op-amp → LMC662 DIP, in-amp →
 // INA125 DIP, 2-pin parts placeable), so this is empty; the machinery stays for any future part.

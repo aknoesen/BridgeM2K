@@ -13,6 +13,7 @@ export type SchKind =
   | 'diode' // junction diode; terminal 'a' = anode, 'c' = cathode (bar end)
   | 'led' // LED; value = forward voltage Vf (V)
   | 'zener' // Zener diode; value = reverse breakdown voltage BV (V)
+  | 'photodiode' // silicon PIN photodiode (BPW 34); value = photocurrent (A), an illumination knob
   | 'bjt' // bipolar transistor (SCH-8); `part` picks NPN/PNP + model. Terminals c/b/e.
   | 'mosfet' // MOSFET (SCH-8); `part` picks N/P channel + model. Terminals d/g/s.
   | 'vsource' // generator input source; terminal 'a' = +, 'b' = -
@@ -78,6 +79,7 @@ export function baseTerminals(kind: SchKind, opModel?: 'ideal' | 'lmc662'): SchT
     case 'diode':
     case 'led':
     case 'zener':
+    case 'photodiode':
       return [
         { name: 'a', gx: 0, gy: 0 }, // anode (triangle side)
         { name: 'c', gx: 2, gy: 0 }, // cathode (bar side)
@@ -434,15 +436,21 @@ export function toCircuit(s: Schematic, title = 'Schematic'): ToCircuitResult {
       else if (c.kind === 'capacitor') comps.push({ kind: 'capacitor', id: String(cc++), nodes: [na, nb], farads: c.value ?? 1e-9 })
       else if (c.kind === 'inductor') comps.push({ kind: 'inductor', id: String(lc++), nodes: [na, nb], henries: c.value ?? 1e-3 })
       else comps.push({ kind: 'vsource', id: String(vc++), nodes: [na, nb], dc: 0, acMag: 1 })
-    } else if (c.kind === 'diode' || c.kind === 'led' || c.kind === 'zener') {
+    } else if (c.kind === 'diode' || c.kind === 'led' || c.kind === 'zener' || c.kind === 'photodiode') {
       const na = rename(netOf(ts[0].gx, ts[0].gy)), nk = rename(netOf(ts[1].gx, ts[1].gy))
-      let p: { is?: number; n?: number; rs?: number; bv?: number } = {}
+      let p: { is?: number; n?: number; rs?: number; bv?: number; cj0?: number; iphoto?: number } = {}
       if (c.kind === 'led') {
         // Set IS so the forward drop ≈ the chosen Vf (V) at ~10 mA, with LED-like ideality N=2.
         const vf = c.value ?? 2.0, N = 2.0, VT = 0.02585, Iref = 0.01
         p = { is: Iref / Math.exp(vf / (N * VT)), n: N, rs: 2, bv: 100 }
       } else if (c.kind === 'zener') {
         p = { bv: c.value ?? 3.3 } // silicon forward (~0.7 V); reverse breaks down at −BV
+      } else if (c.kind === 'photodiode') {
+        // BPW 34 silicon PIN photodiode (basic model). IS sets the ≈0.35 V open-circuit voltage at
+        // the datasheet 80 µA short-circuit current (Ev = 1000 lx); CJO = 72 pF (VR = 0); BV = 32 V
+        // (datasheet max reverse). `value` is the photocurrent in A — sensitivity 80 nA/lx, so
+        // 1000 lx ≈ 80 µA; default 80 µA. The parallel source is added in buildNetlist via `iphoto`.
+        p = { is: 1e-10, n: 1, rs: 10, bv: 32, cj0: 72e-12, iphoto: c.value ?? 80e-6 }
       }
       comps.push({ kind: 'diode', id: String(dd++), nodes: [na, nk], ...p })
     } else if (c.kind === 'bjt') {
