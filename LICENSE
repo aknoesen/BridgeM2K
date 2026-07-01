@@ -1,3 +1,19 @@
+===============================================================================
+Copyright & Jurisdiction Notice
+
+Copyright © 2026 The Regents of the University of California. This software is
+made available under the Apache License, Version 2.0. This open-source release
+applies strictly to the software code and its functional logic as a standalone
+tool. It does not convey, imply, or grant any licenses to broader patent
+portfolios held by the University of California, nor does it restrict the
+authors from independently creating separate, copyrighted instructional text,
+curricula, or commercial derivative educational materials.
+
+Developed by André Knoesen, Department of Electrical and Computer Engineering,
+University of California, Davis.
+===============================================================================
+
+
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -186,7 +202,8 @@
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
-   Copyright 2026 André Knoesen
+   Copyright 2026 The Regents of the University of California
+   Developed by André Knoesen, Dept. of Electrical and Computer Engineering, UC Davis
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.

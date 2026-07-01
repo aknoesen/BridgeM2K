@@ -86,4 +86,5 @@ See `CLAUDE.md` for the signal-math constitution and `docs/` for the engineering
 
 ## License
 
-Apache-2.0. See `LICENSE`.
+Copyright © 2026 The Regents of the University of California. Licensed under Apache-2.0 — see `LICENSE`
+for the full text and the copyright & jurisdiction notice. Developed by André Knoesen (UC Davis).
