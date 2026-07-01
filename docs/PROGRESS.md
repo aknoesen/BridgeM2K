@@ -8,7 +8,24 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ---
 
-## Next session: start here (updated 2026-06-30)
+## Next session: start here (updated 2026-07-01)
+
+**BenchBridge rebrand is LIVE + FB-1 (scope Vpp bug) is DONE.** The app renamed BridgeM2K → BenchBridge
+(commits `aa43781` rename + `78056a4` Regents copyright + `9df9d8b`/`9233694` lockup/icon → bb-monogram),
+all pushed to `origin/main` (repo is now `aknoesen/benchbridge`; Render URL stays `bridgem2k.onrender.com`).
+Cowork's on-disk NOTICE/README were truncated (dropped the third-party list) — repaired from LICENSE.
+
+**FB-1 (scope measurement window) is DONE** (Track K). Root cause: `Oscilloscope.tsx` measured Vpp/RMS
+over the **visible graticule span** (`winSamples = windowSec·Fs`), which at a fast timebase is **< 1
+signal period**, so `vmax−vmin` under-reported Vpp ("reads half"). Fixed by measuring over the **full
+captured record** (`ch1src.x` / `ch2src.x`) in both the normal and XY paths — `measureTrace`'s math
+untouched. This also fixes the RC "output Vpp > input Vpp" credibility bug: both channels shared the
+same sub-period window, which catches different phases per channel (input near a zero-crossing, the
+phase-shifted output near a peak); the full record gives each its true peak-to-peak, so output ≤ input.
+2 new `scope.test.ts` tests (full record → Vpp=2A; quarter-cycle window under-reports). Build clean,
+**167/167**, no `core/signal.ts` change. ⚠ Live-Chrome re-verify of the RC example recommended (I
+reasoned it from the window fix + unit tests, didn't drive the browser). **Next `TODO`: FB-2** (ground
+1−/2− on single-ended examples), then FB-3 (UI polish), FB-4 (Quickstart), then F-7.
 
 **TIA-3 (single-supply TLV9062 TIA example + Cf helper + part-aware board Check) is DONE — Track J
 complete.** Four pieces:

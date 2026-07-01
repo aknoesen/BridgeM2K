@@ -82,3 +82,25 @@ describe('measureTrace', () => {
     expect(m.freq).toBeNull()
   })
 })
+
+// FB-1: the scope now measures over the full captured record (≥ 1 cycle), not the visible graticule
+// span. This test pins the reason: a sub-period window under-reports Vpp (Peggy's "Vpp reads half"),
+// while the full multi-period record gives the true peak-to-peak. measureTrace's math is unchanged —
+// the fix is the window the Oscilloscope feeds it.
+describe('FB-1: measurement window must span ≥ 1 cycle for correct Vpp', () => {
+  const A = 2 // amplitude 2 V → true Vpp = 4 V; 1 kHz at Fs=100k → 100 samples/period
+  const sineA = (n: number) => {
+    const x = new Float64Array(n)
+    for (let i = 0; i < n; i++) x[i] = A * Math.sin((2 * Math.PI * 1000 * i) / Fs)
+    return x
+  }
+
+  it('full multi-period record reports Vpp = 2A', () => {
+    expect(measureTrace(sineA(1600), 1 / Fs).vpp).toBeCloseTo(2 * A, 2) // 4 V
+  })
+
+  it('a sub-period (quarter-cycle) window under-reports Vpp — the bug the full-record fix avoids', () => {
+    const quarter = sineA(1600).subarray(0, 25) // 25 samples ≈ quarter period
+    expect(measureTrace(quarter, 1 / Fs).vpp).toBeLessThan(2 * A - 0.5) // reads ~A, not 2A
+  })
+})

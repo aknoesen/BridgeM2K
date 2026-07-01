@@ -238,10 +238,10 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
         xs[i] = (tr1.v[i] + ch1Offset) / ch1VoltsPerDiv
         ys[i] = (tr2.v[i] + ch2Offset) / ch2VoltsPerDiv
       }
-      const winSamples = Math.round(windowSec * Fs)
-      const startIdx = Math.max(0, Math.round(offsetSec * Fs))
-      setMeas1(measureTrace(ch1src.x.subarray(startIdx, startIdx + winSamples), 1 / Fs))
-      setMeas2(measureTrace(ch2src.x.subarray(startIdx, startIdx + winSamples), 1 / Fs))
+      // FB-1: measure over the full captured record (many cycles), not the visible graticule span —
+      // a sub-period window would under-report Vpp (vmax−vmin misses the true extremes).
+      setMeas1(measureTrace(ch1src.x, 1 / Fs))
+      setMeas2(measureTrace(ch2src.x, 1 / Fs))
       const xyLayout: Partial<Plotly.Layout> = {
         paper_bgcolor: 'var(--bg-display)', plot_bgcolor: 'var(--bg-display)',
         font: { color: 'var(--text-primary)', size: 11 },
@@ -274,11 +274,12 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
       })
     }
 
-    // Measurements over the full-resolution captured window (not the downsampled trace).
-    const winSamples = Math.round(windowSec * Fs)
-    const startIdx = Math.max(0, Math.round(offsetSec * Fs))
-    setMeas1(measureTrace(ch1src.x.subarray(startIdx, startIdx + winSamples), 1 / Fs))
-    setMeas2(ch2Enabled && ch2src ? measureTrace(ch2src.x.subarray(startIdx, startIdx + winSamples), 1 / Fs) : null)
+    // FB-1: measure over the full captured record, not the visible graticule span. At a fast timebase
+    // the visible window spans < 1 signal period, so vmax−vmin under-reports Vpp (reads ~amplitude, not
+    // peak-to-peak). The full record covers many cycles → stable, correct Vpp/RMS/freq, and both
+    // channels use the identical window so an RC output can't read a larger Vpp than its input.
+    setMeas1(measureTrace(ch1src.x, 1 / Fs))
+    setMeas2(ch2Enabled && ch2src ? measureTrace(ch2src.x, 1 / Fs) : null)
 
     // Trigger level marker (on the source channel's scaling) + centre alignment line when triggered.
     const srcVpd = trigSource === 'ch2' ? ch2VoltsPerDiv : ch1VoltsPerDiv
