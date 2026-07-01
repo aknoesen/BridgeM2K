@@ -1,50 +1,30 @@
 <svg viewBox="0 0 824 256" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="BenchBridge">
   <defs>
-    <linearGradient id="lpanel" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#0a2c52"/>
-      <stop offset="100%" stop-color="#02101f"/>
-    </linearGradient>
-    <radialGradient id="lhaze" cx="16%" cy="50%" r="40%">
-      <stop offset="0%" stop-color="#FFBF00" stop-opacity="0.22"/>
-      <stop offset="100%" stop-color="#FFBF00" stop-opacity="0"/>
-    </radialGradient>
-    <filter id="lbloom" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="13"/>
-    </filter>
-    <filter id="ltxt" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="5"/>
-    </filter>
+    <filter id="lbloom" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="13"/></filter>
+    <filter id="ltxt" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5"/></filter>
+    <!-- "bb" monogram: Bench = steel-white b, Bridge = Aggie Gold b -->
     <g id="lbb" fill="none" stroke-linecap="round" stroke-linejoin="round">
       <path d="M150 132 L150 360"/>
       <path d="M150 305 a55 55 0 1 1 110 0 a55 55 0 1 1 -110 0"/>
     </g>
-    <g id="lmm" fill="none" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M246 360 L246 202 L311 296 L376 202 L376 360"/>
-    </g>
-    <g id="ltk" fill="none" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M393 343 C393 320 437 320 437 345 C437 366 410 379 393 401 L441 401"/>
-      <path d="M456 316 L456 406"/>
-      <path d="M493 336 L461 369 L495 406"/>
+    <g id="lbb2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M310 132 L310 360"/>
+      <path d="M310 305 a55 55 0 1 1 110 0 a55 55 0 1 1 -110 0"/>
     </g>
   </defs>
-
   <!-- transparent background: the page colour shows through; the glyph's own bloom is the glow -->
-  <!-- icon (Aggie Gold neon, scaled to ~240) -->
+  <!-- icon (neon "bb", scaled to ~200) -->
   <g transform="translate(8,8) scale(0.46875)">
     <use href="#lbb" filter="url(#lbloom)" stroke="#2b5b8f" stroke-width="20"/>
     <use href="#lbb" stroke="#dfe9f5" stroke-width="22"/>
     <use href="#lbb" stroke="#ffffff" stroke-width="7.5"/>
-    <use href="#lmm" filter="url(#lbloom)" stroke="#FFBF00" stroke-width="22"/>
-    <use href="#lmm" stroke="#FFBF00" stroke-width="22"/>
-    <use href="#lmm" stroke="#FFF4D0" stroke-width="7.5"/>
-    <use href="#ltk" filter="url(#lbloom)" stroke="#FFBF00" stroke-width="16"/>
-    <use href="#ltk" stroke="#FFBF00" stroke-width="13"/>
-    <use href="#ltk" stroke="#FFF4D0" stroke-width="4.5"/>
+    <use href="#lbb2" filter="url(#lbloom)" stroke="#FFBF00" stroke-width="22"/>
+    <use href="#lbb2" stroke="#FFBF00" stroke-width="22"/>
+    <use href="#lbb2" stroke="#FFF4D0" stroke-width="7.5"/>
   </g>
-
-  <!-- wordmark: Bridge crisp white, M2K Aggie Gold with glow -->
-  <g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="700" font-size="80" letter-spacing="-1.5">
-    <text x="288" y="158" fill="#FFBF00" filter="url(#ltxt)" opacity="0.5">BenchBridge</text>
-    <text x="288" y="158" fill="#ffffff">Bench<tspan fill="#FFBF00">Bridge</tspan></text>
+  <!-- wordmark: Bench crisp white, Bridge Aggie Gold with glow -->
+  <g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="700" font-size="74" letter-spacing="-1.5">
+    <text x="280" y="156" fill="#FFBF00" filter="url(#ltxt)" opacity="0.5">BenchBridge</text>
+    <text x="280" y="156" fill="#ffffff">Bench<tspan fill="#FFBF00">Bridge</tspan></text>
   </g>
 </svg>
