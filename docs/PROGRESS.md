@@ -10,6 +10,35 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Next session: start here (updated 2026-06-30)
 
+**TIA-3 (single-supply TLV9062 TIA example + Cf helper + part-aware board Check) is DONE — Track J
+complete.** Four pieces:
+- **Example** (`core/examples.ts`, `tia-photodiode`, Amplifiers group): photodiode → **TLV9062**
+  inverting input, **Rf 33 kΩ + Cf 1 nF** feedback, **`+` at a 10k/1k Vref divider (≈0.45 V) off V+**,
+  1+ probe on the output, **no W1** (so transimpedance mode works directly). Photodiode **cathode →
+  summing node, anode → GND**, so the 80 µA photocurrent drives Vout **up** from Vref. Verified in sim
+  (`examples.test.ts`): `.op` Vout ≈ 3 V — above Vref, inside 0–5 V (correct orientation, not railed).
+- **Cf helper** (`core/tia.ts` + test): pure `tiaCompensation(Cin, Rf, GBW, cfActual?)` → recommended
+  `Cf ≈ √(Cin/(2π·Rf·GBW))`, the resulting −3 dB bandwidth, and a **peaking** flag when the actual Cf is
+  absent/too small. Non-positive inputs are guarded.
+- **Part-aware board Check** (`core/breadboard.ts`): `SchematicExpectation.dips.rails` gained
+  `vnegTo: 'V-' | 'GND'`; a single-supply op-amp (`supplyDefault.vee === 0`, i.e. TLV9062) sets
+  `'GND'`, and `checkEquivalence` then requires the **V− pin on the GND rail** (message updated). Kit
+  ±5 parts keep `'V-'` — F-4 rail tests updated to assert the new field; existing Checks unchanged.
+- **Inspector hint** (`SchematicEditor.tsx`): selecting a photodiode shows Cj0 ≈ 72 pF + the Cf formula,
+  and — when it's wired to an op-amp inverting input with a feedback Rf (discovered via `computeNets`)
+  — a concrete **suggested Cf + bandwidth** and a peaking warning if the present Cf is too small.
+
+Build clean, **165/165** vitest, no `core/signal.ts` change (12-bit canary intact). ROADMAP TIA-3 →
+DONE; **Track J (photodiode + TIA-0/1/2/3) is fully built.** `core/netlist.ts` (TIA-1 AC term) and
+`core/breadboard.ts` (TIA-3 single-supply Check) were the flagged allowed-file touches.
+
+⚠ **Live-Chrome verification is partial** (as with TIA-1/2): I verified the DC operating point, the
+transimpedance math, and the board expectation via unit tests + the clean build, but did **not** load
+the example in a browser to eyeball the scope DC level / the transimpedance Bode / a live board Check.
+Recommend a quick Chrome pass on `tia-photodiode` before relying on it in class. **Next `TODO`:** the
+tester **punch-list FB-1→FB-4** (FB-1 = scope Vpp measurement-window bug, highest), then **F-7** (board
+auto-route) — both staged by Cowork, awaiting andre's go.
+
 **TIA-2 (transimpedance read in the Network Analyzer) is DONE.** The Bode can now read a
 **transimpedance** `Z(f) = V(out)/I_in` (denominator = the photodiode's 1 A AC photocurrent from
 TIA-1), not just a voltage ratio. New pure helper `transimpedance(res, outName)` in `core/spice.ts`

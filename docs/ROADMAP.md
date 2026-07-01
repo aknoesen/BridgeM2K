@@ -229,13 +229,27 @@ change anywhere → the 12-bit canary is untouched throughout. Spec: `docs/specs
 | TIA-0 | **Add the TLV9062 op-amp model** (the summer TIA project's amp) — **NEXT (andre, 2026-06-30).** Dual low-voltage CMOS RRIO: GBW 10 MHz, slew 6.5 V/µs, supply **1.8–5.5 V total**, rail-to-rail in+out, outputHeadroom ≈ 0.02 (RR), Vos ~2 mV max (display only), Iq ~0.55 mA/ch. Reuses the SCH-9 level-1 `buildOpampSubckt`. **Decisions locked (andre, 2026-06-30):** (1) **"course parts" tier** (new `origin: kit\|course\|legacy` tag + neutral "course part" label, NOT the not-in-kit warning); (2) **SOIC-to-DIP adapter footprint** on the breadboard (new 8-pin `DIP_DEFS` entry, Check works); (3) **single +5 V default via a part-aware `supplyDefault`** (`{vcc:5, vee:0}`; kit parts keep `{vcc:5, vee:-5}`) so the netlist stops hardcoding ±5 V — the one real modelling change. See spec. | — | DONE |
 | TIA-1 | **AC photocurrent stimulus.** Give the photodiode's `Iph` source an AC magnitude (default 1 A) emitted only under `.ac`, leaving `.op`/`.tran` byte-identical. With a 1 A stimulus, `V(out)` reads as transimpedance in ohms directly. Pure netlist change + tests. | photodiode-bpw34 merged | DONE |
 | TIA-2 | **Transimpedance read in the Network Analyzer.** A mode that plots `Z(f) = V(out)/I_in` as `|Z|` in **dBΩ and linear Ω** (toggle — andre 2026-06-30) (+ phase), reusing the −3 dB classifier; denominator is the 1 A photocurrent. New pure `transimpedance()` helper + a mode toggle in `NetworkAnalyzer.tsx`. | TIA-1 | DONE |
-| TIA-3 | **Guided single-supply TLV9062 TIA example + compensation helper (ships, not deferred — andre 2026-06-30).** A photodiode→TLV9062→Rf(+Cf) example running **single-supply (+5 V)** with the `+` input at a Vref divider, built to make the rocky single-supply transition visible (output rests at Vref not 0 V, no negative swing, photodiode orientation matters, bench ±5 V must not cross the part). No W1 source, so transimpedance mode works directly. Plus a pure `core/tia.ts` that recommends `Cf ≈ √(Cin/(2π·Rf·GBW))`, predicts the −3 dB bandwidth, and flags peaking. **Also folds in (andre 2026-06-30) a part-aware breadboard Check: when `supplyDefault.vee===0`, V− on GND satisfies the negative-supply pin, so the single-supply TIA boards clean** (from TIA-0's open board-Check question). | TIA-0, TIA-2 | TODO |
+| TIA-3 | **Guided single-supply TLV9062 TIA example + compensation helper (ships, not deferred — andre 2026-06-30).** A photodiode→TLV9062→Rf(+Cf) example running **single-supply (+5 V)** with the `+` input at a Vref divider, built to make the rocky single-supply transition visible (output rests at Vref not 0 V, no negative swing, photodiode orientation matters, bench ±5 V must not cross the part). No W1 source, so transimpedance mode works directly. Plus a pure `core/tia.ts` that recommends `Cf ≈ √(Cin/(2π·Rf·GBW))`, predicts the −3 dB bandwidth, and flags peaking. **Also folds in (andre 2026-06-30) a part-aware breadboard Check: when `supplyDefault.vee===0`, V− on GND satisfies the negative-supply pin, so the single-supply TIA boards clean** (from TIA-0's open board-Check question). | TIA-0, TIA-2 | DONE |
 
 Notes:
 - **Decisions locked (andre, 2026-06-30):** TIA-2 plots **both dBΩ and a linear-Ω** axis (a toggle, not dBΩ-only); TIA-3 **ships the `core/tia.ts` Cf compensation helper** (no TIA-4 defer).
 - **Canary:** independent of these circuit changes — confirm the no-circuit 12-bit floor stays −104 dBFS.
 - The photodiode part itself was an ad-hoc add (not a phase); this track is the deliberate follow-on
   that turns it into a teachable TIA front-end for the analog sequence (EEC100 target).
+
+## Track K — Tester-feedback punch-list (Peggy Zhu review, 2026-06-30)
+
+From Peggy Zhu's review of the deployed app (positive overall — intuitive, Quickstart clear, transfer
+flow holds up). Bug-fix + polish, **not** new features. **Sequenced after Track J** (do TIA-3 first).
+Work FB-1 → FB-4 in order, each its own commit. None touches `core/signal.ts`. Full repros, diagnosis,
+and DoD in `docs/specs/tester-feedback-punchlist.md`.
+
+| ID | Deliverable | Depends on | Status |
+|----|-------------|-----------|--------|
+| FB-1 | **Scope measurement bugs (highest).** Vpp reads half (shows amplitude not peak-to-peak), and RC low-pass output Vpp > input Vpp. `measureTrace` math is correct (`vpp=vmax−vmin`) — the bug is the **measurement window** fed to it in `Oscilloscope.tsx` (spans < 1 cycle); fix to ≥ 1 full cycle on both channels; RC symptom is likely the same root cause. Regression test in `scope.test.ts`. | TIA-3 | TODO |
+| FB-2 | **Ground 1−/2− on single-ended examples.** Wire the ADC negative inputs to GND on the single-ended examples for real single-ended fidelity; **leave the deliberately differential examples** (diode I-V) untouched. Audit `examples.ts`. | — | TODO |
+| FB-3 | **UI polish.** Replace the internal **"LOOP-1"** string leaking in `SchematicEditor.tsx:933` with plain user text; add a **Clear-canvas confirm**; move **BOARD Check errors** from center-screen to a side panel. | — | TODO |
+| FB-4 | **Quickstart fixes.** Three "missing space" typos ("signaloutputs"/"Bodeplot"/"W2set" — JSX whitespace-adjacency, not literal strings); a plain **"simulates, not a physical M2K / not a Scopy replacement"** note; and a step that **loads a W1/W2 example** before the Signal-Gen/Scope section (today the divider is loaded, so the guided flow dead-ends). | — | TODO |
 
 ## Recommended session sequence
 

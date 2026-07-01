@@ -12,8 +12,43 @@ import { createSpiceEngine, type SpiceEngine, transferFunction } from '../core/s
 import { UNIT, TUNE_RANGE, fmtEng, parseEng, tunePos, tuneValue } from '../core/units'
 import { kitValues, isKitValue, nearestKitValue, formatValue, type PassiveKind } from '../core/kit'
 import { opampList, getOpamp, isKitOpamp } from '../core/opamps'
+import { tiaCompensation, type TiaCompensation } from '../core/tia'
 import { exportSvgToPng } from './exportImage'
 import './Instrument.css'
+
+// TIA-3: when a selected photodiode drives an op-amp inverting input, find the feedback Rf/Cf and the
+// op-amp GBW so the inspector can suggest a compensation Cf. Returns null when the part isn't wired as
+// a transimpedance front-end (no op-amp on the summing node, or no feedback resistor).
+const PHOTODIODE_CJ0 = 72e-12 // BPW 34 junction capacitance — dominates the op-amp input cap
+function tiaHintFor(sch: Schematic, pdId: string): { rfOhms: number; gbwHz: number; cfActual?: number; comp: TiaCompensation } | null {
+  const pd = sch.components.find((c) => c.id === pdId && c.kind === 'photodiode')
+  if (!pd) return null
+  const nets = computeNets(sch)
+  const netOf = (gx: number, gy: number) => nets.get(`${gx},${gy}`)
+  const pdNets = new Set(terminalsOf(pd).map((t) => netOf(t.gx, t.gy)))
+  for (const op of sch.components) {
+    if (op.kind !== 'opamp' || !op.part || !isKitOpamp(op.part)) continue
+    const byName = new Map(terminalsOf(op).map((t) => [t.name, netOf(t.gx, t.gy)]))
+    const inN = byName.get('inN'), out = byName.get('out')
+    if (!inN || !out || !pdNets.has(inN)) continue // photodiode must reach the summing node
+    const feedback = (kind: SchKind): number | undefined => {
+      for (const c of sch.components) {
+        if (c.kind !== kind) continue
+        const ts = terminalsOf(c)
+        if (ts.length !== 2) continue
+        const a = netOf(ts[0].gx, ts[0].gy), b = netOf(ts[1].gx, ts[1].gy)
+        if ((a === inN && b === out) || (a === out && b === inN)) return c.value
+      }
+      return undefined
+    }
+    const rf = feedback('resistor')
+    if (!rf || rf <= 0) continue
+    const cf = feedback('capacitor')
+    const gbw = getOpamp(op.part).gbwHz
+    return { rfOhms: rf, gbwHz: gbw, cfActual: cf, comp: tiaCompensation(PHOTODIODE_CJ0, rf, gbw, cf) }
+  }
+  return null
+}
 
 const GRID = 24
 const PAD = 16
@@ -805,6 +840,29 @@ export default function SchematicEditor({ schematic, setSchematic, snapshot, und
                     onPointerDown={() => snapshot()}
                     onChange={(e) => setSelValueNum(tuneValue(Number(e.target.value), lo, hi))}
                     style={{ width: 90 }} />
+                </div>
+              )
+            })()}
+            {sel.kind === 'photodiode' && (() => {
+              // TIA-3: compensation hint. If this photodiode drives an op-amp TIA, suggest the
+              // stabilising feedback Cf ≈ √(Cin/(2π·Rf·GBW)); otherwise just show the formula + Cj0.
+              const hint = tiaHintFor(sch, sel.id)
+              return (
+                <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.5 }}>
+                  <div>Junction cap C<sub>j0</sub> ≈ 72 pF. In a transimpedance amp this forms the input
+                    pole with R<sub>f</sub>; add a feedback C<sub>f</sub> ≈ √(C<sub>in</sub>/(2π·R<sub>f</sub>·GBW)) to keep it stable.</div>
+                  {hint ? (
+                    <div style={{ marginTop: 3 }}>
+                      Detected TIA: R<sub>f</sub> = {fmtEng(hint.rfOhms)}Ω, GBW = {fmtEng(hint.gbwHz)}Hz →
+                      <b> suggested C<sub>f</sub> ≈ {fmtEng(hint.comp.cfRecommended)}F</b> (BW ≈ {fmtEng(hint.comp.bandwidthHz)}Hz).
+                      {' '}{hint.cfActual !== undefined ? `Your Cf = ${fmtEng(hint.cfActual)}F.` : 'No Cf yet.'}
+                      {hint.comp.peaking && (
+                        <span style={{ color: '#ffaa55' }}> ⚠ C<sub>f</sub> is below the suggested value — expect peaking/ringing.</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 3 }}>Wire the cathode to an op-amp inverting input with a feedback R<sub>f</sub> to see a specific C<sub>f</sub> suggestion.</div>
+                  )}
                 </div>
               )
             })()}

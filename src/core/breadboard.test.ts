@@ -147,7 +147,7 @@ describe('breadboard op-amp packages (F-4) — footprint follows the kit part', 
     expect(d.kind).toBe('opamp-quad')
     expect(d.name).toBe('OP484')
     expect(d.pinNets).toHaveLength(14)
-    expect(d.rails).toEqual({ vpos: 3, vneg: 10 })
+    expect(d.rails).toEqual({ vpos: 3, vneg: 10, vnegTo: 'V-' }) // ±5 kit part → V− on the −rail
     expect(d.pinNets[0]).toBeDefined() // OUT A (pin 1)
     expect(d.pinNets[1]).toBeDefined() // −IN A (pin 2)
     expect(d.pinNets[2]).toBeDefined() // +IN A (pin 3)
@@ -158,7 +158,7 @@ describe('breadboard op-amp packages (F-4) — footprint follows the kit part', 
     expect(d.kind).toBe('opamp-single')
     expect(d.name).toBe('OP27')
     expect(d.pinNets).toHaveLength(8)
-    expect(d.rails).toEqual({ vpos: 6, vneg: 3 })
+    expect(d.rails).toEqual({ vpos: 6, vneg: 3, vnegTo: 'V-' })
     expect(d.pinNets[5]).toBeDefined() // OUT (pin 6)
     expect(d.pinNets[1]).toBeDefined() // −IN (pin 2)
     expect(d.pinNets[2]).toBeDefined() // +IN (pin 3)
@@ -169,7 +169,7 @@ describe('breadboard op-amp packages (F-4) — footprint follows the kit part', 
     expect(d.kind).toBe('lmc662')
     expect(d.name).toBe('LMC662')
     expect(d.pinNets).toHaveLength(8)
-    expect(d.rails).toEqual({ vpos: 7, vneg: 3 })
+    expect(d.rails).toEqual({ vpos: 7, vneg: 3, vnegTo: 'V-' })
   })
 
   it('dipPinHoles lays a 14-pin quad across 7 columns (pin4 = f8 V+, pin11 = e8 V−)', () => {

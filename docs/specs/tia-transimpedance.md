@@ -166,7 +166,15 @@ existing examples unchanged. No `core/signal.ts` change. PROGRESS + ROADMAP (TIA
     the bench ±5 V must **not** be wired across the part (TIA-0 decision 3). A one-line
     single-supply-vs-split-supply contrast against the existing ±5 V OP484 inverting-amp example is the
     payoff.
-- **Compensation helper (decision for andre: ship now or defer like SWEEP-1's staircase):** a pure,
+- **Part-aware board Check — single-supply V− on GND (folded into TIA-3, andre 2026-06-30).** TIA-0
+  surfaced this: the breadboard Check still requires V+ **and** V− on the ±5 rails, but the correct
+  single-supply wiring for the TLV9062 ties its **V− pin to GND** (`vee = 0`). So a correctly-built
+  single-supply TIA currently **fails Check**. Make the Check part-aware: when the op-amp's
+  `supplyDefault.vee === 0`, the negative-supply pin is satisfied by **GND** (net `0`) instead of a
+  negative rail; the positive pin still needs the +5 rail. The example must board **clean** (Check
+  passes) as the single-supply TIA. Reuses the `supplyDefault` added in TIA-0; touches
+  `core/breadboard.ts` (the op-amp rail-power Check) — flag it in PROGRESS.
+- **Compensation helper (ships — andre 2026-06-30, not deferred):** a pure,
   tested `core/tia.ts` — given `Cin` (photodiode `CJO` + op-amp input cap), `Rf`, and op-amp `gbwHz`
   (from `opamps.ts`), return the recommended `Cf ≈ √(Cin/(2π·Rf·GBW))`, the predicted closed-loop
   −3 dB bandwidth, and a peaking flag when Cf is absent/too small. Surface it as a read-only hint in
@@ -174,8 +182,10 @@ existing examples unchanged. No `core/signal.ts` change. PROGRESS + ROADMAP (TIA
   up as a TIA-4 note here and in ROADMAP rather than silently dropping it.
 
 **DoD:** build clean; example loads single-supply and both scope (dark-state output ≈ Vref, swings
-toward +5 V under light, stays in-rail) and transimpedance Bode look right in Chrome; if the helper ships, `core/tia.ts` unit tests cover the Cf formula and the peaking
-flag against a worked example. No `core/signal.ts` change. PROGRESS + ROADMAP (TIA-3 → DONE); one commit.
+toward +5 V under light, stays in-rail) and transimpedance Bode look right in Chrome; the example
+**boards clean — breadboard Check passes** with V− on GND (the part-aware Check above); `core/tia.ts`
+unit tests cover the Cf formula and the peaking flag against a worked example; existing ±5 kit op-amp
+boards still Check unchanged. No `core/signal.ts` change. PROGRESS + ROADMAP (TIA-3 → DONE); one commit.
 
 ---
 
@@ -196,8 +206,9 @@ flag against a worked example. No `core/signal.ts` change. PROGRESS + ROADMAP (T
 **Allowed (across the three phases):** `src/core/netlist.ts` (the `Iph` AC term only — flag in
 PROGRESS, like SWEEP-1 flagged `netlist.ts`), `src/core/schematic.ts` (photodiode mapping pass-through),
 `src/core/netlist.test.ts`, the Network Analyzer transfer-function helper + `src/components/NetworkAnalyzer.tsx`,
-`src/core/examples.ts`, `src/core/tia.ts` (+ test, if TIA-3 helper ships), the photodiode/op-amp
-inspector component (hint only), `docs/PROGRESS.md`, `docs/ROADMAP.md`, this spec.
+`src/core/examples.ts`, `src/core/tia.ts` (+ test, TIA-3 helper), `src/core/breadboard.ts` (TIA-3
+part-aware single-supply Check only — flag in PROGRESS), the photodiode/op-amp inspector component
+(hint only), `docs/PROGRESS.md`, `docs/ROADMAP.md`, this spec.
 
 **Forbidden:** `core/signal.ts` (protected math + canary), the `Analysis` union structure, and the
 op-amp/diode `.model` device fidelity (the macromodels are SCH-8/9 territory — TIA modelling reuses

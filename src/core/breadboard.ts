@@ -338,9 +338,11 @@ export interface SchematicExpectation {
   // schematic — a pin tied to a supply rail or to another pin (datasheet-mandated wiring such as
   // the INA125's reference and sense straps). `pin`/`to` are 0-based pin indices; `to` may also be
   // a rail name. `label` is the student-facing hint shown when the strap is missing.
+  // rails.vnegTo (TIA-3) names the rail the V− pin must reach: the V− rail by default, or GND for a
+  // single-supply part (op-amp supplyDefault.vee === 0), whose V− pin ties to ground, not a −rail.
   dips: {
     id: string; kind: DipPkg; name?: string; pinNets: (string | undefined)[]
-    rails?: { vpos: number; vneg: number }
+    rails?: { vpos: number; vneg: number; vnegTo?: 'V-' | 'GND' }
     straps?: { pin: number; to: number | 'V+' | 'V-' | 'GND'; label: string }[]
   }[]
   // SCH-8: discrete transistors (3 legs in schematic-terminal order: BJT c/b/e, MOSFET d/g/s).
@@ -375,7 +377,11 @@ export function schematicExpectation(s: Schematic): SchematicExpectation {
       pinNets[a.out] = byName.get('out')
       pinNets[a.inN] = byName.get('inN')
       pinNets[a.inP] = byName.get('inP')
-      dips.push({ id: c.id, kind: pkg, name: opampBoardName(c.part), pinNets, rails: def.rails })
+      // TIA-3: a single-supply part (supplyDefault.vee === 0, e.g. the TLV9062) ties its V− pin to
+      // GND, not a −rail; the Check follows suit. Kit ±5 parts keep V− on the V− rail.
+      const singleSupply = c.part && isKitOpamp(c.part) ? getOpamp(c.part).supplyDefault?.vee === 0 : false
+      const rails = def.rails ? { ...def.rails, vnegTo: (singleSupply ? 'GND' : 'V-') as 'V-' | 'GND' } : undefined
+      dips.push({ id: c.id, kind: pkg, name: opampBoardName(c.part), pinNets, rails })
     } else if (c.kind === 'ina125') {
       // INA125 → 16-pin DIP. Map the in-amp's signal pins to the datasheet pinout (1-based):
       // 6 VIN−, 7 VIN+, 8 RG, 9 RG, 10 VO; V+ (1) / V− (3) via the rails. The reference (IAref,
@@ -455,8 +461,14 @@ export function checkEquivalence(s: Schematic, board: BoardLayout, holes: Hole[]
     // A powered part must have its supply pins on the rails.
     if (d.rails) {
       const vp = d.rails.vpos, vn = d.rails.vneg
+      // TIA-3: single-supply parts want V− on GND; others on the V− rail.
+      const vnegPort = d.rails.vnegTo === 'GND' ? 'GND' : 'V-'
       if (bn(holesForDip[vp] ?? '?') !== bn(PORT_TERMINAL['V+'])) return { ok: false, message: `Wire ${d.id} pin ${vp + 1} (V+) to the V+ rail.` }
-      if (bn(holesForDip[vn] ?? '?') !== bn(PORT_TERMINAL['V-'])) return { ok: false, message: `Wire ${d.id} pin ${vn + 1} (V−) to the V− rail.` }
+      if (bn(holesForDip[vn] ?? '?') !== bn(PORT_TERMINAL[vnegPort] ?? '?')) {
+        return { ok: false, message: vnegPort === 'GND'
+          ? `Wire ${d.id} pin ${vn + 1} (V−) to the GND rail (single-supply part).`
+          : `Wire ${d.id} pin ${vn + 1} (V−) to the V− rail.` }
+      }
     }
     // Datasheet-mandated chip wiring (e.g. INA125 reference/sense/sleep straps). Each pin must
     // share a node with its target — another pin, or a supply rail.

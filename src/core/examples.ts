@@ -241,6 +241,39 @@ export const EXAMPLES: Example[] = [
     schematic: nonInvertingAmp(),
   },
   {
+    id: 'tia-photodiode', name: 'Photodiode TIA (TLV9062, single-supply)', group: 'Amplifiers',
+    blurb: 'A photodiode transimpedance amplifier on the course TLV9062 — running SINGLE-SUPPLY (+5 V, V− → GND), because the TLV9062 maxes at 5.5 V so the M2K\'s ±5 V cannot cross it. The + input sits at a small Vref (≈0.45 V from the 10 k/1 k divider off V+), NOT ground, so the output has room to swing UP. Dark: the output rests at Vref. Light: the 80 µA photocurrent drives it up to Vout = Vref + Iph·Rf ≈ 3 V (Rf 33 kΩ, well inside the 0–5 V rails). There is no negative swing — flip the photodiode and the output pins at a rail and looks "dead". Open the Network Analyzer and switch to Transimpedance mode: |Z| is flat at Rf then rolls off (Cf 1 nF sets the corner). Contrast with the ±5 V OP484 inverting amp, whose output can swing both ways. Boards as a SOIC-8-on-adapter with V− on the GND rail.',
+    ch1Vdiv: 1,
+    schematic: {
+      // Single-supply TIA. Photodiode CATHODE → op-amp inverting input (summing node at Vref),
+      // ANODE → GND, so the photocurrent pulls the summing node and drives Vout UP from Vref.
+      components: [
+        { id: 'VP', kind: 'vplus', gx: 2, gy: 4 },
+        { id: 'Rt', kind: 'resistor', gx: 4, gy: 4, value: 10000 },              // V+ → Vref (divider top)
+        { id: 'Rb', kind: 'resistor', gx: 6, gy: 4, rotation: 1, value: 1000 },  // Vref → GND (divider bottom)
+        { id: 'U1', kind: 'opamp', gx: 10, gy: 4, part: 'tlv9062' },             // inP(10,4) inN(10,6) out(14,5)
+        { id: 'D1', kind: 'photodiode', gx: 8, gy: 6, value: 80e-6 },            // anode(8,6) cathode(10,6)=inN
+        { id: 'Cf', kind: 'capacitor', gx: 10, gy: 8, value: 1e-9 },             // feedback cap (a(10,8) b(12,8))
+        { id: 'Rf', kind: 'resistor', gx: 10, gy: 10, value: 33000 },           // feedback R (a(10,10) b(12,10))
+        { id: 'G1', kind: 'ground', gx: 6, gy: 8 },                              // divider bottom → GND
+        { id: 'G2', kind: 'ground', gx: 8, gy: 8 },                              // photodiode anode → GND
+        { id: 'P1', kind: 'scope1', gx: 16, gy: 5 },                             // 1+ on the output
+      ],
+      wires: [
+        { x1: 2, y1: 4, x2: 4, y2: 4 },    // V+ → Rt.a
+        { x1: 6, y1: 4, x2: 10, y2: 4 },   // Vref (Rt.b = Rb.a) → inP
+        { x1: 6, y1: 6, x2: 6, y2: 8 },    // Rb.b → ground
+        { x1: 8, y1: 6, x2: 8, y2: 8 },    // photodiode anode → ground
+        { x1: 10, y1: 6, x2: 10, y2: 8 },  // inN (= photodiode cathode) → Cf.a
+        { x1: 10, y1: 8, x2: 10, y2: 10 }, // Cf.a → Rf.a (parallel feedback, summing-node side)
+        { x1: 14, y1: 5, x2: 14, y2: 8 },  // out → down
+        { x1: 14, y1: 8, x2: 12, y2: 8 },  // → Cf.b (out side)
+        { x1: 12, y1: 8, x2: 12, y2: 10 }, // Cf.b → Rf.b
+        { x1: 14, y1: 5, x2: 16, y2: 5 },  // out → 1+
+      ],
+    },
+  },
+  {
     id: 'rlc-bandpass', name: 'RLC band-pass (~1.6 kHz)', group: 'Passive',
     blurb: 'Series L-C with output across R. Peaks at resonance (Q ≈ 10). Note: the 100 mH inductor is above the kit\'s 10 mH max, so the inspector flags it "not in your parts kit" — a simulation-only demo (everything else loads as kit values).',
     w1: sine(1600), ch1Vdiv: 0.2,
