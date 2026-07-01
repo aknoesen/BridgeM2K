@@ -1,4 +1,4 @@
-# BridgeM2K
+# BenchBridge
 
 A browser-based digital twin of the [Analog Devices ADALM2000](https://www.analog.com/en/resources/evaluation-hardware-and-software/evaluation-boards-kits/adalm2000.html) (M2K) USB instrument, styled after the Scopy software interface. Draw a circuit, measure it with a full bench of virtual instruments, and transfer it to a solderless breadboard — all in the browser, no hardware and nothing to install.
 
@@ -52,7 +52,7 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (e.g. `http://localhost:5173/BridgeM2K/`). Run `npm test` for the core-math test suite.
+Open the URL Vite prints (e.g. `http://localhost:5173/benchbridge/`). Run `npm test` for the core-math test suite.
 
 ## Building
 
@@ -66,8 +66,8 @@ Output goes to `dist/`. The app is fully static (no backend).
 
 The build is fully static (`dist/`), no backend. The live site runs on **Render** via the included
 `render.yaml` Blueprint (served at root, `BASE_PATH=/`); it also deploys to **GitHub Pages** at the
-`/BridgeM2K/` subpath, the default base (`npx gh-pages -d dist`). The base path is
-`process.env.BASE_PATH || '/BridgeM2K/'`; `render.yaml` holds the Render specifics.
+`/benchbridge/` subpath, the default base (`npx gh-pages -d dist`). The base path is
+`process.env.BASE_PATH || '/benchbridge/'`; `render.yaml` holds the Render specifics.
 
 ## Tech stack
 

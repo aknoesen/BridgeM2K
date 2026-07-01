@@ -515,7 +515,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <nav className="nav-panel">
-        <div className="nav-logo" onClick={() => setEntered(false)} title="Welcome" style={{ cursor: 'pointer' }}><img src={`${import.meta.env.BASE_URL}bridgem2k.svg`} alt="BridgeM2K" style={{ width: 48, height: 48, display: "block", margin: "0 auto" }} /></div>
+        <div className="nav-logo" onClick={() => setEntered(false)} title="Welcome" style={{ cursor: 'pointer' }}><img src={`${import.meta.env.BASE_URL}benchbridge.svg`} alt="BenchBridge" style={{ width: 48, height: 48, display: "block", margin: "0 auto" }} /></div>
         {navBtn('quickstart', '▷', <>Quick<br/>start</>, 'Quickstart — new here? Start with this', quickstartSeen && active !== 'quickstart' && !presetId)}
         {/* Order mirrors the app's workflow: learn -> design -> build -> measure. */}
         {navBtn('schematic', '▤', 'Circuit', 'Schematic Editor')}

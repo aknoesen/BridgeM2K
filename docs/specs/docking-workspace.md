@@ -104,7 +104,7 @@ component-local (Layer 2 is E-3, optional).
   - autosave current layout to localStorage (survives reload), and
   - explicit Save/Open named workspace as a `.json` file, reusing the schematic Save/Open UX
     pattern in `SchematicEditor.tsx` for consistency.
-- Verify the lib's CSS/assets resolve under the `/BridgeM2K/` base path (CONVENTIONS §11).
+- Verify the lib's CSS/assets resolve under the `/benchbridge/` base path (CONVENTIONS §11).
 
 **Acceptance criteria:**
 - Panels dock, snap, resize, and tab without console errors; UI stays responsive.

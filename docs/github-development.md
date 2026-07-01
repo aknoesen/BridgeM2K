@@ -1,6 +1,6 @@
-# GitHub development & delivery — practices for BridgeM2K
+# GitHub development & delivery — practices for BenchBridge
 
-How this repo ships, and the order we're hardening it in. BridgeM2K is a **live tool for ~300
+How this repo ships, and the order we're hardening it in. BenchBridge is a **live tool for ~300
 students** (Render auto-deploy on push to `main`), so the priority is simple: **a broken build must
 never reach students.** This doc is the plan of record; update it as items land.
 

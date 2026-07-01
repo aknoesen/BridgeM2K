@@ -59,7 +59,7 @@ has to be re-expressed in the generic docking model. Pedagogy caution (spec): fr
 confuse first-years, so keep presets the default and docking the advanced surface.
 
 Verify before committing: dockview popout support on this version, and that its CSS/assets resolve
-under the `/BridgeM2K/` base path (CONVENTIONS §11).
+under the `/benchbridge/` base path (CONVENTIONS §11).
 
 ### Option 3 — Separate webpages / windows (NOT recommended as a first move)
 

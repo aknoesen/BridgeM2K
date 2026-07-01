@@ -49,9 +49,9 @@ export default function Quickstart({ onGoTo, onLoadExample }: Props) {
         <div ref={scrollRef} onScroll={(e) => { lastScroll = e.currentTarget.scrollTop }}
           style={{ padding: 24, overflow: 'auto', maxWidth: 860, lineHeight: 1.7, color: 'var(--text-primary)' }}>
 
-          <h2 style={{ color: GOLD, margin: '0 0 4px' }}>Welcome to BridgeM2K</h2>
+          <h2 style={{ color: GOLD, margin: '0 0 4px' }}>Welcome to BenchBridge</h2>
           <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>
-            New to this app, or new to the ADALM2000 (M2K) itself? Start here. BridgeM2K is a digital
+            New to this app, or new to the ADALM2000 (M2K) itself? Start here. BenchBridge is a digital
             twin of the real M2K USB instrument: every panel here behaves like the matching instrument
             in Analog Devices' Scopy software, so what you do in the browser maps directly onto the
             bench hardware you will use in lab.

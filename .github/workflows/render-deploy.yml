@@ -26,10 +26,10 @@ jobs:
     needs: build-test            # deploy only runs if build-test succeeded
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger deploy of bridgem2k via Render API
+      - name: Trigger deploy of benchbridge via Render API
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          SERVICE_ID: srv-d900u7n7f7vs739md7o0   # bridgem2k
+          SERVICE_ID: srv-d900u7n7f7vs739md7o0   # benchbridge
         run: |
           if [ -z "$RENDER_API_KEY" ]; then
             echo "RENDER_API_KEY secret is not set"; exit 1

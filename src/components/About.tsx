@@ -1,7 +1,7 @@
 // About panel — app identity, Apache-2.0 license, and third-party open-source credits.
 import './Instrument.css'
 
-const REPO = 'https://github.com/aknoesen/BridgeM2K'
+const REPO = 'https://github.com/aknoesen/benchbridge'
 const CREDITS = [
   { name: 'ngspice', what: 'SPICE circuit simulator (compiled to WebAssembly)', license: 'modified BSD', url: 'https://ngspice.sourceforge.io/' },
   { name: 'eecircuit-engine', what: 'ngspice-WASM wrapper + TypeScript API', license: 'MIT', url: 'https://www.npmjs.com/package/eecircuit-engine' },
@@ -46,7 +46,7 @@ export default function About() {
       <div className="display-area">
         <div className="display-header"><span className="display-title">About</span></div>
         <div style={{ padding: 24, overflow: 'auto', maxWidth: 760, lineHeight: 1.7, color: 'var(--text-primary)' }}>
-          <h2 style={{ color: '#2ee6ff', margin: '0 0 4px', letterSpacing: '0.01em' }}>BridgeM2K</h2>
+          <h2 style={{ color: '#2ee6ff', margin: '0 0 4px', letterSpacing: '0.01em' }}>BenchBridge</h2>
           <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>
             A browser-based digital twin of the Analog Devices ADALM2000 (M2K), built for introductory
             analog and mixed-signal courses. Draw a circuit, measure it with the same instruments
@@ -75,7 +75,7 @@ export default function About() {
 
           <h3 style={{ marginBottom: 4 }}>License</h3>
           <p style={{ marginTop: 0 }}>
-            BridgeM2K is open source under the <b>Apache License 2.0</b>. © 2026 André Knoesen.{' '}
+            BenchBridge is open source under the <b>Apache License 2.0</b>. © 2026 André Knoesen.{' '}
             <a href={REPO} target="_blank" rel="noopener noreferrer" style={link}>Source on GitHub</a>.
           </p>
 
@@ -92,7 +92,7 @@ export default function About() {
           <h3 style={{ marginBottom: 4 }}>Trademarks</h3>
           <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: 13 }}>
             ADALM2000, M2K, Scopy, LTSpice, and Analog Devices are trademarks of Analog Devices, Inc.
-            BridgeM2K is an independent educational project and is not affiliated with or endorsed by
+            BenchBridge is an independent educational project and is not affiliated with or endorsed by
             Analog Devices.
           </p>
         </div>

@@ -16,7 +16,7 @@ export default function Welcome({ onEnter, onQuickstart }: Props) {
       justifyContent: 'center', gap: 26, padding: 24, textAlign: 'center', color: 'var(--text-primary)',
       background: AGGIE_BLUE,
     }}>
-      <img src={`${base}bridgem2k-lockup.svg`} alt="BridgeM2K" style={{ width: 'min(560px, 82vw)', maxHeight: 180 }} />
+      <img src={`${base}benchbridge-lockup.svg`} alt="BenchBridge" style={{ width: 'min(560px, 82vw)', maxHeight: 180 }} />
 
       <p style={{ maxWidth: 680, fontSize: 16, lineHeight: 1.7, color: 'rgba(255,255,255,0.82)', margin: 0 }}>
         A browser-based digital twin of the Analog Devices{' '}
@@ -37,7 +37,7 @@ export default function Welcome({ onEnter, onQuickstart }: Props) {
         background: AGGIE_GOLD, border: 'none', borderRadius: 8, cursor: 'pointer',
         boxShadow: '0 0 26px rgba(255,191,0,0.45)',
       }}>
-        Launch BridgeM2K →
+        Launch BenchBridge →
       </button>
 
       <button onClick={onQuickstart} style={{
@@ -49,7 +49,7 @@ export default function Welcome({ onEnter, onQuickstart }: Props) {
 
       <div style={{ position: 'absolute', bottom: 18, fontSize: 11, color: 'rgba(255,255,255,0.65)' }}>
         Open source · Apache-2.0 ·{' '}
-        <a href="https://github.com/aknoesen/BridgeM2K" target="_blank" rel="noopener noreferrer" style={{ color: AGGIE_GOLD }}>GitHub</a>
+        <a href="https://github.com/aknoesen/benchbridge" target="_blank" rel="noopener noreferrer" style={{ color: AGGIE_GOLD }}>GitHub</a>
       </div>
 
       {/* UC Davis official wordmark — subtle co-brand, bottom-right corner. White/reversed for the

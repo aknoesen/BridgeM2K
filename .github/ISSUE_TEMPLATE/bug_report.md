@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report something that isn't working in BridgeM2K
+about: Report something that isn't working in BenchBridge
 title: "[Bug] "
 labels: bug
 assignees: ''

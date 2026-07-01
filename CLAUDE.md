@@ -1,4 +1,4 @@
-# CLAUDE.md — BridgeM2K
+# CLAUDE.md — BenchBridge
 
 A React digital twin of the Analog Devices ADALM2000 (M2K) USB instrument, built for the
 EEC1 first-year ECE course at UC Davis. It is now a full Scopy-style bench: signal generator,
@@ -42,8 +42,8 @@ view, trust the host: re-check with `git status` before assuming damage.
 | Plots | Plotly.js (`plotly.js-dist-min`) |
 | SPICE | `eecircuit-engine` (ngspice → WASM) in a Web Worker — see `core/spice.ts` / `core/spice.worker.ts` |
 | Build | `tsc && vite build` |
-| Deploy | GitHub Pages at `/BridgeM2K/` (default base) or Render at `/` (sets `BASE_PATH=/`); base is `process.env.BASE_PATH \|\| '/BridgeM2K/'` |
-| Dev server | `npm run dev` → `http://localhost:5173/BridgeM2K/` (or 5174 if port taken) |
+| Deploy | GitHub Pages at `/benchbridge/` (default base) or Render at `/` (sets `BASE_PATH=/`); base is `process.env.BASE_PATH \|\| '/benchbridge/'` |
+| Dev server | `npm run dev` → `http://localhost:5173/benchbridge/` (or 5174 if port taken) |
 
 No state-management library. Shared state (signal params, schematic, board, the shared
 schematic undo/redo history, workspace/layout) lives in `App.tsx`; view-only state stays
@@ -241,7 +241,7 @@ npm run build          # outputs to dist/
 # then copy dist/ to GitHub Pages branch, or use gh-pages
 ```
 
-`vite.config.ts` has `base: '/BridgeM2K/'` — required for GitHub Pages subdirectory
+`vite.config.ts` has `base: '/benchbridge/'` — required for GitHub Pages subdirectory
 deployment. Asset paths break if this is removed.
 
 ## Built since the original spec

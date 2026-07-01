@@ -29,7 +29,7 @@ Risk and mitigation:
 - It is a **small project** (low stars, few maintainers). Mitigate by putting it behind our
   own `SpiceEngine` adapter interface (below) so it can be swapped for **tscircuit/ngspice**
   (MIT wrapper, also ngspice-WASM) or **ngspiceX** with no change to callers.
-- WASM asset loading must respect the `/BridgeM2K/` base path (see CONVENTIONS §11).
+- WASM asset loading must respect the `/benchbridge/` base path (see CONVENTIONS §11).
 
 Alternatives considered (keep as fallbacks, do not install now): `tscircuit/ngspice`,
 `ngspiceX`, `danchitnis/ngspice`. All are ngspice-WASM; the adapter makes them
@@ -77,7 +77,7 @@ export function createSpiceEngine(): SpiceEngine   // returns the eecircuit-engi
 **Acceptance criteria:**
 - A hardcoded RC low-pass `.ac` and `.tran` netlist runs and returns parsed data.
 - **Works in `npm run build && npm run preview`**, not only `npm run dev` — confirm the
-  `.wasm` loads under `/BridgeM2K/`. This is the real test of this phase; document it.
+  `.wasm` loads under `/benchbridge/`. This is the real test of this phase; document it.
 - UI stays responsive during `runSim` (worker confirmed).
 - Build clean; spectrum regression canary holds.
 
