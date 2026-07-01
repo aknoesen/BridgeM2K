@@ -250,6 +250,16 @@ export default function App() {
 
   const drawn = useMemo(() => toCircuit(schematic, 'Drawn circuit'), [schematic])
   const drawnValid = drawn.warnings.length === 0
+  // "Show W1/W2/CH1/CH2 only if they're in the simulation." CH2 is in the sim when a valid drawn
+  // circuit places a 2+ probe; the scope uses this to auto-show/hide CH2. Generators are in the sim
+  // when their W1/W2 port is placed in the schematic; the Signal Generator uses genInSim to surface
+  // only the panels that feed the drawing. With nothing placed (standalone) genInSim is all-false and
+  // the Signal Generator falls back to showing both (see SignalGenerator).
+  const ch2InSim = drawnValid && drawn.probes.ch2 != null
+  const genInSim = useMemo(() => ({
+    w1: schematic.components.some((c) => c.kind === 'awg1'),
+    w2: schematic.components.some((c) => c.kind === 'awg2'),
+  }), [schematic])
 
   // NA-TUNE: the drawn circuit's tunable parts (R/C/L) + a setter, so the Network Analyzer can
   // host live tuning knobs next to the Bode plot. Editing here flows back into the schematic,
@@ -435,7 +445,7 @@ export default function App() {
     switch (id) {
       case 'scope':
         return <Oscilloscope params={params} signal={scopeSig1} signal2={scopeSig2} params2={params2}
-          running={running} circuitActive={circuitActive} outputClipping={outputClipping}
+          running={running} circuitActive={circuitActive} ch2InSim={ch2InSim} outputClipping={outputClipping}
           circuitFs={scopeCircuitFs} onWindowSecChange={setScopeWinSec} compact={multi}
           scopeReq={scopeReq} onScopeApplied={() => setScopeReq(null)}
           onRunToggle={() => setRunning(r => !r)} onParams2Change={(k, v) => setParams2(prev => ({ ...prev, [k]: v }))} />
@@ -496,6 +506,7 @@ export default function App() {
           onLoadExample={loadExample} />
       case 'siggen':
         return <SignalGenerator params={params} params2={params2} signal={signal} signal2={signal2} running={running} compact={multi}
+          inSim={genInSim}
           onParamChange={updateParam} onParam2Change={(k, v) => setParams2(prev => ({ ...prev, [k]: v }))}
           onWaveTypeChange={(w: WaveType) => updateParam('waveType', w)}
           onRunToggle={() => setRunning(r => !r)} />

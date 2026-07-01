@@ -11,6 +11,10 @@ interface Props {
   signal2: { t: Float64Array; x: Float64Array } | null
   running: boolean
   compact?: boolean
+  // Which generators are in the drawn circuit (W1/W2 port placed in the schematic). The panel
+  // surfaces only the generators that feed the drawing; with neither placed (standalone) it shows
+  // both. Omitted → treated as standalone.
+  inSim?: { w1: boolean; w2: boolean }
   onParamChange: <K extends keyof SignalParams>(key: K, value: SignalParams[K]) => void
   onParam2Change: <K extends keyof SignalParams>(key: K, value: SignalParams[K]) => void
   onWaveTypeChange: (w: WaveType) => void
@@ -24,11 +28,23 @@ const WAVE_TYPES: { value: WaveType; label: string }[] = [
   { value: 'sawtooth', label: 'Sawtooth' },
 ]
 
-export default function SignalGenerator({ params, params2, signal, signal2, running, compact, onParamChange, onParam2Change, onWaveTypeChange, onRunToggle }: Props) {
+export default function SignalGenerator({ params, params2, signal, signal2, running, compact, inSim, onParamChange, onParam2Change, onWaveTypeChange, onRunToggle }: Props) {
   const plotRef = useRef<HTMLDivElement>(null)
   const initialised = useRef(false)
-  // Which generator the controls below edit. Both are always drawn on the plot.
+  // Which generator the controls below edit.
   const [gen, setGen] = useState<'W1' | 'W2'>('W1')
+
+  // "Show W1/W2 only if they're in the simulation." When the schematic places a generator port, show
+  // only the W1/W2 that feed the drawing; with neither placed (standalone / no schematic) show both so
+  // the plain generator→scope flow still works.
+  const anyPlaced = !!(inSim && (inSim.w1 || inSim.w2))
+  const showW1 = !anyPlaced || !!inSim?.w1
+  const showW2 = !anyPlaced || !!inSim?.w2
+  // Never leave the editor pointed at a hidden generator.
+  useEffect(() => {
+    if (gen === 'W2' && !showW2) setGen('W1')
+    else if (gen === 'W1' && !showW1) setGen('W2')
+  }, [showW1, showW2, gen])
 
   // Build the time-domain plot — both W1 and W2 so the student always sees both at once.
   useEffect(() => {
@@ -56,11 +72,11 @@ export default function SignalGenerator({ params, params2, signal, signal2, runn
     }
 
     const traces: Partial<Plotly.PlotData>[] = []
-    if (signal) {
+    if (signal && showW1) {
       const d = downsample(signal)
       traces.push({ x: d.x, y: d.y, type: 'scatter', mode: 'lines', line: { color: 'var(--ch1-color)', width: 2.5 }, name: 'W1' })
     }
-    if (signal2) {
+    if (signal2 && showW2) {
       const d = downsample(signal2)
       traces.push({ x: d.x, y: d.y, type: 'scatter', mode: 'lines', line: { color: 'var(--ch2-color)', width: 2.5 }, name: 'W2' })
     }
@@ -90,7 +106,7 @@ export default function SignalGenerator({ params, params2, signal, signal2, runn
     } else {
       Plotly.react(el, traces, layout, config)
     }
-  }, [signal, signal2, params.frequency, params2.frequency, params.samplingRate])
+  }, [signal, signal2, showW1, showW2, params.frequency, params2.frequency, params.samplingRate])
 
   // Active generator's params + the matching change handlers.
   const p = gen === 'W1' ? params : params2
@@ -135,8 +151,8 @@ export default function SignalGenerator({ params, params2, signal, signal2, runn
         <div className="control-row">
           <label>Channel</label>
           <div className="wave-selector">
-            <button className={gen === 'W1' ? 'active' : ''} onClick={() => setGen('W1')}>W1</button>
-            <button className={gen === 'W2' ? 'active' : ''} onClick={() => setGen('W2')}>W2</button>
+            {showW1 && <button className={gen === 'W1' ? 'active' : ''} onClick={() => setGen('W1')}>W1</button>}
+            {showW2 && <button className={gen === 'W2' ? 'active' : ''} onClick={() => setGen('W2')}>W2</button>}
           </div>
         </div>
 

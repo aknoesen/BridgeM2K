@@ -17,6 +17,10 @@ interface Props {
   // True when CH1/CH2 are circuit outputs (fixed-length .tran). When false the scope
   // synthesises its own capture buffer sized to the timebase, so long time/div works.
   circuitActive?: boolean
+  // True when the active sim actually drives CH2 (a 2+ probe is placed in the drawn circuit). When a
+  // circuit is active the scope mirrors the sim: CH2 auto-shows iff this is true, and hides otherwise
+  // (no manual enable needed). In standalone/no-circuit use this is undefined and CH2 stays manual.
+  ch2InSim?: boolean
   // True when the simulated circuit output is riding the supply rails (clipping) — shows a hint.
   outputClipping?: boolean
   // One-shot request from App (set when an example loads): scope mode + Volts/div framing. Consumed
@@ -68,7 +72,7 @@ const fmtF = (f: number | null) => (f == null ? '—' : f >= 1000 ? `${(f / 1000
 const fmtT = (s: number | null) => (s == null ? '—' : s < 1e-3 ? `${(s * 1e6).toFixed(1)} µs` : s < 1 ? `${(s * 1e3).toFixed(3)} ms` : `${s.toFixed(4)} s`)
 const fmtD = (d: number | null) => (d == null ? '—' : `${(d * 100).toFixed(1)} %`)
 
-export default function Oscilloscope({ params, signal, signal2, params2, running, circuitActive, outputClipping, circuitFs, onWindowSecChange, compact, onRunToggle, onParams2Change, scopeReq, onScopeApplied }: Props) {
+export default function Oscilloscope({ params, signal, signal2, params2, running, circuitActive, ch2InSim, outputClipping, circuitFs, onWindowSecChange, compact, onRunToggle, onParams2Change, scopeReq, onScopeApplied }: Props) {
   const plotRef = useRef<HTMLDivElement>(null)
   const initialised = useRef(false)
   const frameRef = useRef(0) // free-running capture-phase counter
@@ -146,6 +150,14 @@ export default function Oscilloscope({ params, signal, signal2, params2, running
     if (scopeReq.ch2Vdiv) setCh2VoltsPerDiv(scopeReq.ch2Vdiv)
     onScopeApplied?.()
   }, [scopeReq, onScopeApplied])
+
+  // Mirror the sim: while a circuit is active, CH2 shows iff the circuit drives a 2+ probe. This is
+  // the "show CH1/CH2 only if they're in the simulation" rule — the student no longer hand-enables
+  // CH2 for a circuit that already feeds it, and a circuit with no 2+ probe won't show an empty CH2.
+  // Only runs when circuitActive changes state; standalone (no circuit) keeps the manual toggle.
+  useEffect(() => {
+    if (circuitActive) setCh2Enabled(!!ch2InSim)
+  }, [circuitActive, ch2InSim])
 
   // Display-unit handling: short windows read in ms, long ones (≥1 s) in seconds.
   const windowSec = SCOPE_H_DIVS * timePerDiv
