@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { Simulation } from 'eecircuit-engine'
-import { normalizeResult, transferFunction, findCutoffHz, analyzeBode } from './spice'
+import { normalizeResult, transferFunction, transimpedance, findCutoffHz, analyzeBode } from './spice'
 import { buildNetlist, type Circuit } from './netlist'
 
 const rc: Circuit = {
@@ -360,6 +360,39 @@ describe('LMC662 behavioural op-amp', () => {
     }
     expect(maxSlope / 1e6).toBeGreaterThan(0.85)
     expect(maxSlope / 1e6).toBeLessThan(1.4)
+  }, 30000)
+})
+
+describe('transimpedance (TIA-2)', () => {
+  // Photodiode (1 A AC photocurrent, TIA-1) → ideal op-amp virtual ground → Rf feedback. Since the
+  // stimulus is 1 A, Z(f) = V(out): |Z| is flat at Rf, and a feedback Cf rolls it off at 1/(2π·Rf·Cf).
+  const tia = (rf: number, cf?: number): Circuit => {
+    const components: Circuit['components'] = [
+      { kind: 'diode', id: '1', nodes: ['vg', '0'], is: 1e-10, n: 1, cj0: 72e-12, iphoto: 80e-6, iphotoAc: 1 },
+      { kind: 'opamp', id: '1', model: 'ideal', nodes: { inP: '0', inN: 'vg', out: 'out' }, gain: 1e6 },
+      { kind: 'resistor', id: 'f', nodes: ['out', 'vg'], ohms: rf },
+      { kind: 'ground', id: '0', node: '0' },
+    ]
+    if (cf) components.push({ kind: 'capacitor', id: 'f', nodes: ['out', 'vg'], farads: cf })
+    return { title: 'TIA', components }
+  }
+
+  it('|Z| at low frequency ≈ Rf (dBΩ = 20·log10 Rf)', async () => {
+    const sim = new Simulation(); await sim.start()
+    sim.setNetList(buildNetlist(tia(100000), { kind: 'ac', sweep: 'dec', points: 10, fStart: 1, fStop: 100 }))
+    const z = transimpedance(normalizeResult(await sim.runSim()), 'out')
+    expect(z.magDb[0]).toBeCloseTo(20 * Math.log10(100000), 0) // ≈ 100 dBΩ
+  }, 30000)
+
+  it('a feedback Cf rolls |Z| off with a −3 dB corner near 1/(2π·Rf·Cf)', async () => {
+    const rf = 100000, cf = 159.155e-12 // fc = 1/(2π·1e5·159.155e-12) ≈ 10 kHz
+    const sim = new Simulation(); await sim.start()
+    sim.setNetList(buildNetlist(tia(rf, cf), { kind: 'ac', sweep: 'dec', points: 20, fStart: 100, fStop: 1e6 }))
+    const z = transimpedance(normalizeResult(await sim.runSim()), 'out')
+    const fc = findCutoffHz(z.freq, z.magDb)
+    expect(fc).not.toBeNull()
+    expect(fc as number).toBeGreaterThan(7000)
+    expect(fc as number).toBeLessThan(14000)
   }, 30000)
 })
 

@@ -10,6 +10,25 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Next session: start here (updated 2026-06-30)
 
+**TIA-2 (transimpedance read in the Network Analyzer) is DONE.** The Bode can now read a
+**transimpedance** `Z(f) = V(out)/I_in` (denominator = the photodiode's 1 A AC photocurrent from
+TIA-1), not just a voltage ratio. New pure helper `transimpedance(res, outName)` in `core/spice.ts`
+returns the same `Bode` shape with `magDb` in **dBΩ** (`20·log10|V(out)|`) — so `analyzeBode` /
+`findCutoffHz` work unchanged. `NetworkAnalyzer.tsx` gains a **Mode** toggle (Voltage gain /
+Transimpedance) and, in transimpedance mode, a **dBΩ / Ω (linear)** sub-toggle (andre: both). Linear-Ω
+plots `10^(magDb/20)` on an auto-ranged axis; dB modes keep the Max/Min range. The mag-axis title,
+the −3 dB badge (now paper-anchored so it sits right on either axis), and the caption ("V(out) vs the
+photocurrent (1 A AC)") all follow the mode; toggling mode re-sweeps. 2 new `spice.test.ts` tests:
+low-frequency |Z| ≈ Rf (100 dBΩ for Rf=100 kΩ), and a feedback Cf rolls |Z| off at ≈1/(2π·Rf·Cf).
+Build clean, **158/158**, no `core/signal.ts` change (12-bit canary intact). ROADMAP TIA-2 → DONE.
+**Not yet committed at time of writing.**
+
+⚠ **Live-Chrome check is partial:** the guided **TIA example is TIA-3** (not built yet), so I verified
+the transimpedance math via the unit tests and the build, not by loading a bench example. Full
+"switch to transimpedance, see |Z| flat at Rf then roll off" verification should happen once TIA-3
+lands the example. **Next Track J `TODO`: TIA-3** (single-supply TLV9062 TIA example + `core/tia.ts` Cf
+helper + the part-aware single-supply board Check — `breadboard.ts` is in TIA-3's allowed files).
+
 **TIA-0 (TLV9062 op-amp) is DONE.** The TI TLV9062 (the summer TIA project's amp) is in the op-amp
 library as a **course part** (the summer project's amp; not ADALP2000). Built to andre's three locked
 decisions:

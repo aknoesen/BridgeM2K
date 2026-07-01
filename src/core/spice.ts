@@ -168,6 +168,31 @@ export function transferFunction(r: SimResult, outName: string, inName: string):
   return { freq, magDb, phaseDeg }
 }
 
+// Transimpedance Z(f) = V(out)/I_in for a photodiode-driven TIA (TIA-2). The AC stimulus is the
+// photodiode's photocurrent, normalised to 1 A (TIA-1's `iphotoAc`), so the denominator is unity and
+// Z = V(out): magnitude in dBΩ (20·log10|V(out)|) and phase ∠V(out). Same `Bode` shape as
+// transferFunction, so findCutoffHz / analyzeBode operate on `magDb` unchanged (it is now dBΩ, still a
+// decibel scale). A linear-ohm axis is just 10^(magDb/20) at display time. `outName` matches '(out)'.
+export function transimpedance(r: SimResult, outName: string): Bode {
+  const fi = r.variables.findIndex((v) => v.type === 'frequency')
+  const oi = r.variables.findIndex((v) => v.name.toLowerCase().includes(`(${outName.toLowerCase()})`))
+  const fcol = r.columns[fi]
+  const ocol = r.columns[oi]
+  if (!fcol || fcol.kind !== 'complex' || !ocol || ocol.kind !== 'complex') {
+    throw new Error('transimpedance requires a complex AC result with frequency and out')
+  }
+  const n = r.numPoints
+  const freq = new Float64Array(n)
+  const magDb = new Float64Array(n)
+  const phaseDeg = new Float64Array(n)
+  for (let k = 0; k < n; k++) {
+    freq[k] = fcol.re[k]
+    magDb[k] = 20 * Math.log10(Math.hypot(ocol.re[k], ocol.im[k]))
+    phaseDeg[k] = Math.atan2(ocol.im[k], ocol.re[k]) * (180 / Math.PI)
+  }
+  return { freq, magDb, phaseDeg }
+}
+
 // −3 dB cutoff relative to the low-frequency (passband) gain, interpolated in
 // log-frequency so the reading is not quantized to the sweep grid (LOOP-2). Returns
 // the first frequency where the magnitude falls 3 dB below magDb[0], or null if the

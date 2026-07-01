@@ -5,7 +5,7 @@
 // supply a drawn circuit it sweeps a default RC low-pass. See docs/specs/schematic-ngspice.md.
 import { useEffect, useRef, useState } from 'react'
 import Plotly from 'plotly.js-dist-min'
-import { createSpiceEngine, SpiceEngine, transferFunction, analyzeBode, type BodeFeature, type FilterShape, type SimResult } from '../core/spice'
+import { createSpiceEngine, SpiceEngine, transferFunction, transimpedance, analyzeBode, type BodeFeature, type FilterShape, type SimResult } from '../core/spice'
 import { buildNetlist, type Circuit } from '../core/netlist'
 import { type SchKind } from '../core/schematic'
 import { UNIT, TUNE_RANGE, fmtEng, tunePos, tuneValue } from '../core/units'
@@ -52,11 +52,15 @@ interface Props {
 
 interface BodeData { freq: number[]; magDb: number[]; phaseDeg: number[] }
 type ChannelSel = 'ch1' | 'ch2' | 'both'
+// TIA-2: 'gain' = voltage transfer V(node)/V(in) (dB); 'ztrans' = transimpedance V(out)/I_in (dBΩ),
+// the photodiode-TIA read where the 1 A AC photocurrent (TIA-1) is the denominator.
+type NaMode = 'gain' | 'ztrans'
 
-// Transfer function V(node)/V(in) as plottable arrays, or null if the node isn't in the result.
-function bodeFor(res: SimResult, node: string): BodeData | null {
+// The channel's response as plottable arrays, or null if the node isn't in the result. In
+// transimpedance mode `magDb` is dBΩ (the denominator is the 1 A photocurrent, not V(in)).
+function bodeFor(res: SimResult, node: string, mode: NaMode): BodeData | null {
   try {
-    const tf = transferFunction(res, node, 'in')
+    const tf = mode === 'ztrans' ? transimpedance(res, node) : transferFunction(res, node, 'in')
     return { freq: Array.from(tf.freq), magDb: Array.from(tf.magDb), phaseDeg: Array.from(tf.phaseDeg) }
   } catch {
     return null
@@ -109,6 +113,8 @@ export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, pr
   const [bode1, setBode1] = useState<BodeData | null>(null)
   const [bode2, setBode2] = useState<BodeData | null>(null)
   const [channel, setChannel] = useState<ChannelSel>('ch1')
+  const [mode, setMode] = useState<NaMode>('gain')   // TIA-2: voltage gain vs transimpedance
+  const [zUnit, setZUnit] = useState<'db' | 'lin'>('db') // transimpedance axis: dBΩ or linear Ω
   const [status, setStatus] = useState('idle')
   const [busy, setBusy] = useState(false)
   const runningRef = useRef(false)
@@ -125,8 +131,8 @@ export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, pr
         kind: 'ac', sweep: 'dec', points: pointsPerDecade, fStart, fStop,
       })
       const res = await eng.run(netlist)
-      const b1 = bodeFor(res, probes?.ch1 ?? 'out')
-      const b2 = probes?.ch2 ? bodeFor(res, probes.ch2) : null
+      const b1 = bodeFor(res, probes?.ch1 ?? 'out', mode)
+      const b2 = probes?.ch2 ? bodeFor(res, probes.ch2, mode) : null
       setBode1(b1)
       setBode2(b2)
       const pts = b1?.freq.length ?? b2?.freq.length ?? 0
@@ -151,7 +157,7 @@ export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, pr
     const h = setTimeout(() => { void runSweep() }, 250)
     return () => clearTimeout(h)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fStart, fStop, pointsPerDecade, circuit, probes])
+  }, [fStart, fStop, pointsPerDecade, circuit, probes, mode])
 
   // If CH2 isn't available (no 2+ probe), fall back to CH1.
   useEffect(() => { if (!bode2 && channel !== 'ch1') setChannel('ch1') }, [bode2, channel])
@@ -168,6 +174,12 @@ export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, pr
     // (a hang the ErrorBoundary can't catch). Fall back to sane defaults when non-finite.
     const yMin = Number.isFinite(magMin) ? magMin : -90
     const yMax = Number.isFinite(magMax) ? magMax : 10
+    // TIA-2: transimpedance in linear ohms plots 10^(dBΩ/20) on an auto-ranged axis; dB modes
+    // (voltage gain, or dBΩ) keep the dB magnitude and the Max/Min range. Feature detection
+    // (analyzeBode / cutoffs) always runs on magDb, so it is unaffected by the display unit.
+    const linZ = mode === 'ztrans' && zUnit === 'lin'
+    const toY = (magDb: number[]): number[] => (linZ ? magDb.map((d) => Math.pow(10, d / 20)) : magDb)
+    const magTitle = mode === 'ztrans' ? (linZ ? 'Transimpedance (Ω)' : 'Transimpedance (dBΩ)') : 'Magnitude (dB)'
     const logRange: [number, number] = [Math.log10(fStart), Math.log10(fStop)]
     // A dotted marker at each −3 dB crossing (1 for LP/HP, 2 for BP/notch, none for flat).
     const cutoffShape = (feat?.cutoffs ?? []).map((f) => ({
@@ -190,29 +202,34 @@ export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, pr
     const magData: Plotly.Data[] = []
     const phaseData: Plotly.Data[] = []
     if (showCh1 && bode1) {
-      magData.push({ x: bode1.freq, y: bode1.magDb, type: 'scatter', mode: 'lines', name: 'CH1',
+      magData.push({ x: bode1.freq, y: toY(bode1.magDb), type: 'scatter', mode: 'lines', name: 'CH1',
         line: { color: CH1_COLOR, width: 2.5 }, hoverinfo: 'none' } as Plotly.Data)
       phaseData.push({ x: bode1.freq, y: bode1.phaseDeg, type: 'scatter', mode: 'lines', name: 'CH1',
         line: { color: CH1_COLOR, width: 2.5 }, hoverinfo: 'none' } as Plotly.Data)
     }
     if (showCh2 && bode2) {
-      magData.push({ x: bode2.freq, y: bode2.magDb, type: 'scatter', mode: 'lines', name: 'CH2',
+      magData.push({ x: bode2.freq, y: toY(bode2.magDb), type: 'scatter', mode: 'lines', name: 'CH2',
         line: { color: CH2_COLOR, width: 2.5 }, hoverinfo: 'none' } as Plotly.Data)
       phaseData.push({ x: bode2.freq, y: bode2.phaseDeg, type: 'scatter', mode: 'lines', name: 'CH2',
         line: { color: CH2_COLOR, width: 2.5 }, hoverinfo: 'none' } as Plotly.Data)
     }
 
     const annoF = feat && feat.shape !== 'flat' ? (feat.center ?? feat.cutoffs[0]) : null
-    const cutoffAnno = feat && annoF ? [{ x: Math.log10(annoF), y: yMin + (yMax - yMin) * 0.12,
+    // y is paper-relative so the badge sits correctly whether the axis is dB or linear ohms.
+    const cutoffAnno = feat && annoF ? [{ x: Math.log10(annoF), yref: 'paper' as const, y: 0.12,
       text: bodeAnno(feat),
       showarrow: false, font: { size: 10, color: '#fff' }, bgcolor: 'rgba(40,40,40,0.9)',
       bordercolor: '#666', borderwidth: 1 }] : []
+    const magYAxis: Partial<Plotly.LayoutAxis> = linZ
+      ? { title: { text: magTitle, font: { size: 11 } }, autorange: true, rangemode: 'tozero',
+          gridcolor: '#2a2a2a', zerolinecolor: '#444', tickfont: { size: 10 }, color: 'var(--text-secondary)' }
+      : { title: { text: magTitle, font: { size: 11 } }, range: [yMin, yMax],
+          gridcolor: '#2a2a2a', zerolinecolor: '#444', tickfont: { size: 10 }, color: 'var(--text-secondary)' }
 
     Plotly.react(magRef.current, magData,
       { ...common, margin: { l: 56, r: 16, t: 22, b: 8 },
         xaxis: { ...baseX, showticklabels: false },
-        yaxis: { title: { text: 'Magnitude (dB)', font: { size: 11 } }, range: [yMin, yMax],
-                 gridcolor: '#2a2a2a', zerolinecolor: '#444', tickfont: { size: 10 }, color: 'var(--text-secondary)' },
+        yaxis: magYAxis,
         shapes: cutoffShape, annotations: cutoffAnno,
       }, config)
 
@@ -223,7 +240,7 @@ export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, pr
                  dtick: 45, gridcolor: '#2a2a2a', zerolinecolor: '#444', tickfont: { size: 10 }, color: 'var(--text-secondary)' },
         shapes: cutoffShape,
       }, config)
-  }, [bode1, bode2, channel, magMin, magMax, phaseMin, phaseMax, fStart, fStop])
+  }, [bode1, bode2, channel, magMin, magMax, phaseMin, phaseMax, fStart, fStop, mode, zUnit])
 
   const primaryBode = channel === 'ch2' ? bode2 : (bode1 ?? bode2)
   const feat = primaryBode ? analyzeBode(primaryBode.freq, primaryBode.magDb) : null
@@ -265,8 +282,28 @@ export default function NetworkAnalyzer({ circuit = DEFAULT_CIRCUIT, dutName, pr
           <button className={channel === 'both' ? 'active' : ''} onClick={() => setChannel('both')} disabled={!bode2}>Both</button>
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4 }}>
-          {bode2 ? 'CH1 = 1+ node, CH2 = 2+ node (both vs W1 input).' : 'Wire a 2+ probe to compare a second node.'}
+          {mode === 'ztrans'
+            ? 'Transimpedance: V(out) vs the photodiode photocurrent (1 A AC).'
+            : (bode2 ? 'CH1 = 1+ node, CH2 = 2+ node (both vs W1 input).' : 'Wire a 2+ probe to compare a second node.')}
         </div>
+
+        <div className="section-title">Mode</div>
+        <div className="wave-selector">
+          <button className={mode === 'gain' ? 'active' : ''} onClick={() => setMode('gain')}>Voltage gain</button>
+          <button className={mode === 'ztrans' ? 'active' : ''} onClick={() => setMode('ztrans')}>Transimpedance</button>
+        </div>
+        {mode === 'ztrans' && (
+          <>
+            <div className="wave-selector" style={{ marginTop: 4 }}>
+              <button className={zUnit === 'db' ? 'active' : ''} onClick={() => setZUnit('db')}>dBΩ</button>
+              <button className={zUnit === 'lin' ? 'active' : ''} onClick={() => setZUnit('lin')}>Ω (linear)</button>
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4 }}>
+              Z(f) = V(out) ÷ photocurrent (1 A AC). Use a photodiode TIA with <b>no W1 source</b>, so the
+              photocurrent is the only AC stimulus. |Z| at low frequency ≈ Rf.
+            </div>
+          </>
+        )}
 
         {onTune && tunables && tunables.some((t) => TUNE_RANGE[t.kind]) && (
           <>
