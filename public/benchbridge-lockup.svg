@@ -43,8 +43,8 @@
   </g>
 
   <!-- wordmark: Bridge crisp white, M2K Aggie Gold with glow -->
-  <g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="700" font-size="96" letter-spacing="-1.5">
-    <text x="288" y="162" fill="#FFBF00" filter="url(#ltxt)" opacity="0.5">BenchBridge</text>
-    <text x="288" y="162" fill="#ffffff">Bridge<tspan fill="#FFBF00">M2K</tspan></text>
+  <g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="700" font-size="80" letter-spacing="-1.5">
+    <text x="288" y="158" fill="#FFBF00" filter="url(#ltxt)" opacity="0.5">BenchBridge</text>
+    <text x="288" y="158" fill="#ffffff">Bench<tspan fill="#FFBF00">Bridge</tspan></text>
   </g>
 </svg>
