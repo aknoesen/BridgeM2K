@@ -263,7 +263,7 @@ Spec: `docs/specs/active-realistic-breadboard.md`.
 | Phase | Title | Depends on | Status |
 |-------|-------|-----------|--------|
 | ARB-1 | **Realistic part visuals** — real component bodies scoped to the ADALP2000 kit (resistor **colour bands from value**, ceramic/electrolytic caps, diode/**LED** bodies, DIP with **pin-1**, TO-92, coloured jumpers). Pure `Breadboard.tsx` rendering; model + Check untouched. | F-3 | DONE |
-| ARB-2 | **Active / live board** — bind the already-computed sim state to the board via the net↔node equivalence: on-board **node-voltage probe/readout**, **LED glow ∝ current** (the PWM-LED lab works in sim), an on-board DMM/probe. Sim **read** path only; needs a live `.op`/avg-`.tran` eval + the net↔node map. No `core/signal.ts`. | ARB-1, LOOP-1 | TODO |
+| ARB-2 | **Active / live board** — bind the already-computed sim state to the board via the net↔node equivalence: on-board **node-voltage probe/readout** (hover, DMM-style DC), **LED glow ∝ current** (the PWM-LED lab works in sim). Sim **read** path only (reuses the existing `.tran`; `boardNodeMap` accessor + `core/boardsim.ts` extraction). No `core/signal.ts`. | ARB-1, LOOP-1 | DONE |
 | ARB-3 | **Auto-route (folds in F-7)** — the manual/hint/auto jumper control (`docs/specs/board-autoroute.md`), rendered in the ARB-1 realistic style. | F-7/ARB-1 | TODO |
 
 Notes:

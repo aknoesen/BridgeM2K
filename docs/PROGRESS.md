@@ -10,6 +10,35 @@ state each phase is in; PROGRESS says *how it went and what the next session nee
 
 ## Next session: start here (updated 2026-07-01)
 
+**ARB-2 (active / live breadboard) is DONE** — built to Cowork's D1–D3 (see
+`docs/private/FABLE-ARB2-BRIEF.md`), with the two product forks resolved by andre: **hover readout**
+(probe UX) and a **log 0.1–20 mA brightness curve** (LED glow).
+- **D1** — `boardNodeMap(s, board, holes)` in `core/breadboard.ts`: pure board-net → circuit-node
+  accessor pairing placed pins exactly as `checkEquivalence` does (which is **untouched**), then
+  bridging raw `computeNets` ids to `toCircuit`'s renamed nodes via a mirrored rename scan (kept in
+  sync by comment; WIRE-1 port semantics are frozen). A board net paired with two different nodes
+  (mis-wiring) is **dropped** — no reading beats a wrong reading.
+- **D2** — no new analysis: App's existing circuit `.tran` now also feeds `core/boardsim.ts`:
+  `settledNodeVoltages` (trapezoidal time-average over the settled 2nd span — a DMM's DC reading;
+  ngspice steps are non-uniform, so sample means would bias toward fast edges) and
+  `ledAverageCurrents` (time-averaged **forward** current, reverse clamped to 0 → PWM duty maps to
+  true average brightness).
+- **D3** — LED current derived, not simulated: exclusive-series-resistor `V_R/R` when the usual lab
+  topology provides a private LED-R node (exact + linear), else per-step inversion of the LED's own
+  IS/N/RS diode model (log-form bisection — the naive exponential overflows).
+- **UI** — hovering any hole/terminal shows that node's live DC voltage in a floating chip (both
+  modes — probing mirrors the bench DMM and reveals no wiring answers; net *colouring* stays
+  practice-only). LED domes gain a current-driven halo/brightness (`ledBrightness` in
+  `core/partvisuals.ts`) + an mA tooltip. App passes `liveNodeVolts`/`liveLedCurrents` to the board.
+- **Verification:** build clean; **243/243** (15 new: boardsim unit + a **real-ngspice PWM-LED
+  end-to-end** — 0/5 V 1 kHz square through 470 Ω reads ~3 mA average, exactly half the ~6 mA
+  on-current — plus `boardNodeMap` map/conflict cases and the brightness curve); **12-bit canary
+  −104.29 dBFS test-pinned and green**. ⚠ Visual eyeball (glow aesthetics, chip placement) pending —
+  same headless caveat as ARB-1; Cowork should screenshot it.
+- Also committed this session (separate commit `421915a`): Cowork's staged "show W1/W2/CH2 only if
+  in the simulation" scope+siggen fix, verified on host.
+Next Track L `TODO`: **ARB-3** (auto-route, folds in F-7) — Cowork to stage.
+
 **BenchBridge rebrand is LIVE + FB-1 (scope Vpp bug) is DONE.** The app renamed BridgeM2K → BenchBridge
 (commits `aa43781` rename + `78056a4` Regents copyright + `9df9d8b`/`9233694` lockup/icon → bb-monogram),
 all pushed to `origin/main` (repo is now `aknoesen/benchbridge`; Render URL stays `bridgem2k.onrender.com`).

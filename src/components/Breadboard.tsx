@@ -5,14 +5,14 @@
 import { useMemo, useRef, useState, type Dispatch, type SetStateAction, type CSSProperties, type ReactNode } from 'react'
 import {
   buildHoles, boardNets, boardWidth, boardHeight, PAD, PITCH, CHANNEL_SLOT,
-  schematicExpectation, checkEquivalence, type BoardLayout, type CheckResult,
+  schematicExpectation, checkEquivalence, boardNodeMap, type BoardLayout, type CheckResult,
   dipPinHoles, dipCols, holeKey, DIP_TOP_ROW, DIP_BOT_ROW, DIP_DEFS, type DipPkg,
   to92PinHoles, to92Legend, TO92_ROW,
   TERMINALS, type Terminal, POWER_WIRES, PORT_TERMINAL, unboardable,
 } from '../core/breadboard'
 import { type Schematic, type SchKind } from '../core/schematic'
 import { type SignalParams } from '../core/signal'
-import { resistorBands, ledColor } from '../core/partvisuals'
+import { resistorBands, ledColor, ledBrightness } from '../core/partvisuals'
 import { exportSvgToPng } from './exportImage'
 import './Instrument.css'
 
@@ -37,7 +37,8 @@ const TR_NAME: Record<string, string> = { bjt: 'BJT', mosfet: 'MOSFET' }
 // ── ARB-1: realistic 2-pin part bodies (kit-scoped, rendering only) ──────────────────────────────
 // A realistic body for a placed 2-pin part, drawn along the a→b axis (leads bent to the holes). Pure
 // SVG; no model/Check involvement. Cathode-side features (diode band, LED flat) sit toward b.
-function PartBody({ kind, value, ax, ay, bx, by }: { kind: SchKind; value?: number; ax: number; ay: number; bx: number; by: number }): ReactNode {
+// `glow` (ARB-2): LED emission 0..1 from the live sim's average forward current (ledBrightness).
+function PartBody({ kind, value, ax, ay, bx, by, glow }: { kind: SchKind; value?: number; ax: number; ay: number; bx: number; by: number; glow?: number }): ReactNode {
   const mx = (ax + bx) / 2, my = (ay + by) / 2
   const len = Math.hypot(bx - ax, by - ay) || 1
   const angle = (Math.atan2(by - ay, bx - ax) * 180) / Math.PI
@@ -74,10 +75,15 @@ function PartBody({ kind, value, ax, ay, bx, by }: { kind: SchKind; value?: numb
       </>
     )
   } else if (kind === 'led') {
+    // Live glow: an unlit LED is a dull dome; forward current adds a soft halo + brightens the lens.
+    const g = Math.max(0, Math.min(1, glow ?? 0))
+    const col = ledColor(value)
     body = (
       <>
-        <circle cx={0} cy={0} r={9} fill={ledColor(value)} fillOpacity={0.9} stroke="#00000055" strokeWidth={1} />
-        <circle cx={-2.5} cy={-2.5} r={2.5} fill="#ffffff" fillOpacity={0.5} />
+        {g > 0 && <circle cx={0} cy={0} r={9 + 12 * g} fill={col} opacity={0.28 * g} />}
+        {g > 0 && <circle cx={0} cy={0} r={9 + 5 * g} fill={col} opacity={0.45 * g} />}
+        <circle cx={0} cy={0} r={9} fill={col} fillOpacity={0.55 + 0.45 * g} stroke="#00000055" strokeWidth={1} />
+        <circle cx={-2.5} cy={-2.5} r={2.5} fill="#ffffff" fillOpacity={0.45 + 0.45 * g} />
       </>
     )
   } else if (kind === 'photodiode') {
@@ -144,22 +150,45 @@ interface Props {
   onLoadGenerators?: (w1: SignalParams, w2: SignalParams) => void
   // Push the current schematic onto the shared undo history before a lab Open replaces it.
   snapshotSchematic?: () => void
+  // ARB-2 active board: the circuit loop's live sim state. liveNodeVolts = settled DC voltage per
+  // circuit node (what a DMM reads); liveLedCurrents = average forward current per schematic LED id.
+  // Null/omitted (no valid drawn circuit) → the board renders passively, exactly as before.
+  liveNodeVolts?: Map<string, number> | null
+  liveLedCurrents?: Map<string, number> | null
 }
 
-export default function Breadboard({ schematic, setSchematic, board, setBoard, generators, onLoadGenerators, snapshotSchematic }: Props) {
+export default function Breadboard({ schematic, setSchematic, board, setBoard, generators, onLoadGenerators, snapshotSchematic, liveNodeVolts, liveLedCurrents }: Props) {
   const holes = useMemo(() => buildHoles(), [])
   const holeByKey = useMemo(() => new Map(holes.map((h) => [h.key, h])), [holes])
   const exp = useMemo(() => schematicExpectation(schematic), [schematic])
   const nets = useMemo(() => boardNets(holes, board.jumpers), [holes, board.jumpers])
+  // ARB-2: board-net → circuit-node bridge, so a hovered pin can look up its live sim voltage.
+  const nodeMap = useMemo(() => boardNodeMap(schematic, board, holes), [schematic, board, holes])
 
   const [mode, setMode] = useState<Mode>('practice')
   const [tool, setTool] = useState<Tool>({ kind: 'select' })
   const [pending, setPending] = useState<string | null>(null)
   const [hoverNet, setHoverNet] = useState<string | null>(null)
+  // ARB-2 hover probe: the hovered pin's key (hole or terminal), tracked in BOTH modes — probing a
+  // voltage mirrors the real bench DMM and reveals no wiring answers (net colouring stays
+  // practice-only via hoverNet). Readout renders only when the live sim has a value for its node.
+  const [probeKey, setProbeKey] = useState<string | null>(null)
   const [check, setCheck] = useState<CheckResult | null>(null)
   const [revealed, setRevealed] = useState(false)
   const svgRef = useRef<SVGSVGElement>(null)
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null) // for the jumper rubber-band
+
+  // ARB-2: the hovered pin's live DC voltage — board net → circuit node → settled sim value.
+  // Null when there's no live sim, the pin is unwired, or its net is ambiguous (boardNodeMap drops
+  // mis-wired nets, so a shorted column shows no reading rather than a wrong one).
+  const probeVolts = useMemo(() => {
+    if (!probeKey || !liveNodeVolts) return null
+    const bnet = nets.get(probeKey)
+    if (!bnet) return null
+    const node = nodeMap.get(bnet)
+    if (node === undefined) return null
+    return liveNodeVolts.get(node) ?? null
+  }, [probeKey, liveNodeVolts, nets, nodeMap])
 
   const W = boardWidth(), H = boardHeight()
   const STRIP = 48                 // height of each fixed M2K terminal strip
@@ -444,8 +473,8 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
               const cy = h.y + OY
               return (
                 <g key={h.key} style={{ cursor: 'pointer' }}
-                  onMouseEnter={() => { if (mode === 'practice') setHoverNet(net) }}
-                  onMouseLeave={() => setHoverNet(null)}
+                  onMouseEnter={() => { if (mode === 'practice') setHoverNet(net); setProbeKey(h.key) }}
+                  onMouseLeave={() => { setHoverNet(null); setProbeKey(null) }}
                   onClick={() => onNode(h.key)}>
                   {/* generous invisible hit target (the whole cell) so clicks don't need to be precise */}
                   <circle cx={h.x} cy={cy} r={PITCH / 2 - 1} fill="transparent" />
@@ -490,7 +519,12 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
               return (
                 <g key={p.id} style={{ cursor: tool.kind === 'select' ? 'pointer' : 'default', pointerEvents: tool.kind === 'select' ? 'auto' : 'none' }}
                   onClick={() => { if (tool.kind === 'select') { setBoard((bb) => ({ ...bb, parts: bb.parts.filter((x) => x.id !== p.id) })); setCheck(null) } }}>
-                  <PartBody kind={p.kind} value={p.value ?? schematic.components.find((c) => c.id === p.id)?.value} ax={a.x} ay={a.y} bx={b.x} by={b.y} />
+                  {p.kind === 'led' && liveLedCurrents?.has(p.id) && (
+                    <title>{`${p.id}: ${(liveLedCurrents.get(p.id)! * 1000).toFixed(2)} mA average forward current`}</title>
+                  )}
+                  <PartBody kind={p.kind} value={p.value ?? schematic.components.find((c) => c.id === p.id)?.value}
+                    ax={a.x} ay={a.y} bx={b.x} by={b.y}
+                    glow={p.kind === 'led' ? ledBrightness(liveLedCurrents?.get(p.id) ?? 0) : undefined} />
                   {/* pin dots at the two holes, coloured by net when nets are shown */}
                   <circle cx={a.x} cy={a.y} r={3} fill={(showNets && activeColor.get(nets.get(p.aHole)!)) || '#cfcfcf'} stroke="#000" strokeWidth={0.5} />
                   <circle cx={b.x} cy={b.y} r={3} fill={(showNets && activeColor.get(nets.get(p.bHole)!)) || '#cfcfcf'} stroke="#000" strokeWidth={0.5} />
@@ -574,8 +608,8 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
               const labelY = t.side === 'top' ? y - 13 : y + 19
               return (
                 <g key={t.key} style={{ cursor: 'pointer' }}
-                  onMouseEnter={() => { if (mode === 'practice' && net) setHoverNet(net) }}
-                  onMouseLeave={() => setHoverNet(null)}
+                  onMouseEnter={() => { if (mode === 'practice' && net) setHoverNet(net); setProbeKey(t.key) }}
+                  onMouseLeave={() => { setHoverNet(null); setProbeKey(null) }}
                   onClick={() => onNode(t.key, true)}>
                   {/* generous invisible hit target around the pad + its label */}
                   <rect x={x - 13} y={y - 16} width={26} height={32} fill="transparent" />
@@ -593,6 +627,23 @@ export default function Breadboard({ schematic, setSchematic, board, setBoard, g
                 stroke={wireColor(pending, pending)} strokeOpacity={0.8} strokeWidth={2.5}
                 strokeDasharray="5 4" strokeLinecap="round" style={{ pointerEvents: 'none' }} />
             )}
+            {/* ARB-2 hover probe: the pin's live DC voltage from the running sim (like a bench DMM) */}
+            {probeKey && probeVolts !== null && (() => {
+              const p = pos(probeKey)
+              const label = Math.abs(probeVolts) < 1
+                ? `${(probeVolts * 1000).toFixed(0)} mV`
+                : `${probeVolts.toFixed(2)} V`
+              const w = 20 + label.length * 6.6
+              const x = p.x + 12 + w > W2 ? p.x - 12 - w : p.x + 12 // flip left near the right edge
+              return (
+                <g pointerEvents="none">
+                  <rect x={x} y={p.y - 27} width={w} height={18} rx={4}
+                    fill="#101418" stroke="var(--theory-color)" strokeWidth={1} opacity={0.95} />
+                  <text x={x + w / 2} y={p.y - 14} fontSize={11} fontWeight={700}
+                    fill="var(--theory-color)" textAnchor="middle">{label}</text>
+                </g>
+              )
+            })()}
           </svg>
         </div>
       </div>

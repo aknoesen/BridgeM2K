@@ -30,7 +30,7 @@ describe('breadboard nets (F-1)', () => {
   })
 })
 
-import { checkEquivalence, PORT_TERMINAL, to92PinHoles, type BoardLayout } from './breadboard'
+import { checkEquivalence, boardNodeMap, PORT_TERMINAL, to92PinHoles, type BoardLayout } from './breadboard'
 import { type Schematic } from './schematic'
 
 describe('to92PinHoles (ARB-1 polish: TO-92 placeable in any term row)', () => {
@@ -105,6 +105,32 @@ describe('breadboard equivalence (F-2)', () => {
     const b = correctBoard(); b.parts[1].aHole = 'a4'           // out split into col3 and col4
     b.jumpers.push({ a: 'b4', b: 'd3' })                        // jumper col4 <-> col3 re-joins out
     expect(checkEquivalence(rcSch, b, holes).ok).toBe(true)
+  })
+})
+
+describe('boardNodeMap (ARB-2 board-net → circuit node)', () => {
+  const holes = buildHoles()
+
+  it('maps each wired board net to the toCircuit renamed node (in/out/0)', () => {
+    const b = correctBoard()
+    const bnets = boardNets(holes, b.jumpers)
+    const m = boardNodeMap(rcSch, b, holes)
+    expect(m.get(bnets.get('a1')!)).toBe('in')   // col1 = W1 net
+    expect(m.get(bnets.get('a3')!)).toBe('out')  // col3 = probed R-C node
+    expect(m.get(bnets.get('a5')!)).toBe('0')    // col5 = ground
+  })
+
+  it('drops a board net that a mis-wiring pairs with two different nodes (no wrong readings)', () => {
+    const b = correctBoard()
+    b.jumpers.push({ a: 'b3', b: 'b5' }) // short col3(out) ↔ col5(gnd): merged net is ambiguous
+    const bnets = boardNets(holes, b.jumpers)
+    const m = boardNodeMap(rcSch, b, holes)
+    expect(m.has(bnets.get('a3')!)).toBe(false)  // conflicting net gets NO reading
+    expect(m.get(bnets.get('a1')!)).toBe('in')   // unaffected net still maps
+  })
+
+  it('leaves checkEquivalence behaviour untouched (same fixture still checks ok)', () => {
+    expect(checkEquivalence(rcSch, correctBoard(), holes).ok).toBe(true)
   })
 })
 

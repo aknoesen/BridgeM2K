@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resistorBands, ledColor, RES_COLORS, RES_GOLD } from './partvisuals'
+import { resistorBands, ledColor, ledBrightness, RES_COLORS, RES_GOLD } from './partvisuals'
 
 const [BLACK, BROWN, RED, , YELLOW, , , VIOLET] = RES_COLORS
 
@@ -37,5 +37,19 @@ describe('ledColor (ARB-1 lens colour by Vf)', () => {
     expect(ledColor(2.5)).toBe('#33dd55') // green (2.4–2.9)
     expect(ledColor(3.0)).toBe('#4488ff') // blue  (≥ 2.9)
     expect(ledColor()).toBe('#ffb020')    // default ~2 V → amber
+  })
+})
+
+describe('ledBrightness (ARB-2 log glow curve, 0.1–20 mA)', () => {
+  it('is dark at/below the 0.1 mA floor and full at/above 20 mA', () => {
+    expect(ledBrightness(0)).toBe(0)
+    expect(ledBrightness(1e-4)).toBe(0)
+    expect(ledBrightness(2e-2)).toBeCloseTo(1, 9)
+    expect(ledBrightness(0.1)).toBe(1)
+  })
+  it('scales with log(I): 1 mA sits mid-dim, and 10 mA is brighter than 1 mA', () => {
+    const at1mA = ledBrightness(1e-3)
+    expect(at1mA).toBeCloseTo(Math.log10(10) / Math.log10(200), 6) // ≈ 0.43
+    expect(ledBrightness(1e-2)).toBeGreaterThan(at1mA)
   })
 })

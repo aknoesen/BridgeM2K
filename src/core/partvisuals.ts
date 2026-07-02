@@ -23,3 +23,12 @@ export function ledColor(vf?: number): string {
   const v = vf ?? 2
   return v < 2.0 ? '#ff4433' : v < 2.4 ? '#ffb020' : v < 2.9 ? '#33dd55' : '#4488ff'
 }
+
+// ARB-2: average forward current → glow intensity 0..1, log-scaled the way an indicator LED reads
+// on the bench: invisible at ≤ 0.1 mA, dim near 1 mA, full at 20 mA. Perceived brightness tracks
+// log(I), so a PWM duty sweep dims smoothly instead of snapping (decision: andre 2026-07-01).
+export function ledBrightness(amps: number): number {
+  const I_MIN = 1e-4, I_MAX = 2e-2 // 0.1 mA floor, 20 mA full
+  if (!(amps > I_MIN)) return 0
+  return Math.min(1, Math.log10(amps / I_MIN) / Math.log10(I_MAX / I_MIN))
+}

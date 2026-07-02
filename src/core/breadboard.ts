@@ -506,3 +506,80 @@ export function checkEquivalence(s: Schematic, board: BoardLayout, holes: Hole[]
   }
   return { ok: true, message: '✓ Match — your board is electrically the schematic.' }
 }
+
+// ── ARB-2: board-net → circuit-node map (the "active board" bridge) ─────────────────────────────
+// The live sim reads node voltages under toCircuit's RENAMED node names ('in'/'out'/'0'/netN/…),
+// while the board's connectivity is boardNets' net ids. This pure accessor bridges them: for every
+// placed pin whose schematic net is known (same pairing checkEquivalence performs), map its board
+// net to the schematic node the simulator uses. `checkEquivalence` itself is untouched.
+//
+// The raw-net → renamed-node step mirrors toCircuit's `rename()` (schematic.ts) — same port scan,
+// same priority order. Keep the two in sync if port semantics ever change (they are WIRE-1 frozen).
+// A board net paired with two DIFFERENT schematic nodes (a mis-wiring) is dropped: no reading is
+// better than a wrong reading on a shorted/mis-jumpered net.
+export function boardNodeMap(s: Schematic, board: BoardLayout, holes: Hole[]): Map<string, string> {
+  const nets = computeNets(s)
+  const rawNetOf = (c: { gx: number; gy: number }) => nets.get(`${c.gx},${c.gy}`)
+
+  // Mirror of toCircuit's port scan → rename chain (ground first, then the named instrument nets).
+  const groundNets = new Set<string>()
+  let inNet: string | undefined, in2Net: string | undefined
+  let outNet: string | undefined, outRefNet: string | undefined
+  let scope2Net: string | undefined, scope2RefNet: string | undefined
+  for (const c of s.components) {
+    const net = rawNetOf(terminalsOf(c)[0])
+    if (!net) continue
+    if (c.kind === 'ground') groundNets.add(net)
+    else if (c.kind === 'probe' || c.kind === 'scope1') outNet = net
+    else if (c.kind === 'adc1n') outRefNet = net
+    else if (c.kind === 'scope2') scope2Net = net
+    else if (c.kind === 'adc2n') scope2RefNet = net
+    else if (c.kind === 'vsource' || c.kind === 'awg1') inNet = net
+    else if (c.kind === 'awg2') in2Net = net
+  }
+  const rename = (net: string): string =>
+    groundNets.has(net) ? '0'
+      : net === inNet ? 'in'
+      : net === in2Net ? 'in2'
+      : net === outNet ? 'out'
+      : net === outRefNet ? 'out_n'
+      : net === scope2Net ? 'scope2'
+      : net === scope2RefNet ? 'scope2_n'
+      : net
+
+  const exp = schematicExpectation(s)
+  const bnets = boardNets(holes, board.jumpers)
+  const out = new Map<string, string>()
+  const conflict = new Set<string>()
+  const put = (pinKey: string | undefined, rawNet: string | undefined) => {
+    if (!pinKey || !rawNet) return
+    const bnet = bnets.get(pinKey)
+    if (!bnet) return
+    const node = rename(rawNet).toLowerCase() // ngspice lowercases variable names
+    const prev = out.get(bnet)
+    if (prev !== undefined && prev !== node) conflict.add(bnet)
+    else out.set(bnet, node)
+  }
+  const placedPart = new Map(board.parts.map((p) => [p.id, p]))
+  for (const p of exp.parts) {
+    const pl = placedPart.get(p.id)
+    if (pl) { put(pl.aHole, p.a); put(pl.bHole, p.b) }
+  }
+  const placedDip = new Map((board.dips ?? []).map((d) => [d.id, d]))
+  for (const d of exp.dips) {
+    const pl = placedDip.get(d.id)
+    if (!pl) continue
+    const hs = dipPinHoles(d.kind, pl.col) ?? []
+    d.pinNets.forEach((net, k) => put(hs[k], net))
+  }
+  const placedTr = new Map((board.transistors ?? []).map((t) => [t.id, t]))
+  for (const t of exp.transistors) {
+    const pl = placedTr.get(t.id)
+    if (!pl) continue
+    const hs = to92PinHoles(pl.col, pl.row) ?? []
+    t.pinNets.forEach((net, k) => put(hs[k], net))
+  }
+  for (const p of exp.ports) put(PORT_TERMINAL[p.name], p.net)
+  for (const net of conflict) out.delete(net)
+  return out
+}

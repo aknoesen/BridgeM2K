@@ -4,6 +4,7 @@ import { DEFAULT_CHANNELS, resolveChannelSamples, ChannelInputs, type Samples } 
 import { toCircuit, type Schematic } from './core/schematic'
 import { type SupplySettings, buildNetlist, applyGeneratorParams } from './core/netlist'
 import { createSpiceEngine, type SpiceEngine, sampleNodeTransient } from './core/spice'
+import { settledNodeVoltages, ledSpecs, ledAverageCurrents } from './core/boardsim'
 import SignalGenerator from './components/SignalGenerator'
 import SpectrumAnalyzer from './components/SpectrumAnalyzer'
 import Oscilloscope from './components/Oscilloscope'
@@ -297,8 +298,12 @@ export default function App() {
     return () => { spiceRef.current?.dispose(); spiceRef.current = null }
   }, [])
 
+  // ARB-2: the live-board state read off the SAME .tran below — the settled (2nd-span time-averaged)
+  // voltage of every node, plus each LED's average forward current. No extra sim run.
+  const [boardSim, setBoardSim] = useState<{ nodeV: Map<string, number>; ledI: Map<string, number> } | null>(null)
+
   useEffect(() => {
-    if (!drawnValid) { setCircuitOut(null); setCircuitOut2(null); return }
+    if (!drawnValid) { setCircuitOut(null); setCircuitOut2(null); setBoardSim(null); return }
     let cancelled = false
     const handle = setTimeout(async () => {
       try {
@@ -316,11 +321,17 @@ export default function App() {
         setCircuitOut(x1 ? { t: grid, x: x1 } : null)
         const x2 = drawn.probes.ch2 ? sampleDiff(res, drawn.probes.ch2, drawn.probes.ch2n, sampleTimes) : null
         setCircuitOut2(x2 ? { t: grid, x: x2 } : null)
+        // ARB-2: harvest the board's live values from this result (settled span = the 2nd span)
+        setBoardSim({
+          nodeV: settledNodeVoltages(res, span),
+          ledI: ledAverageCurrents(ledSpecs(schematic, drawn.circuit), drawn.circuit, res, span),
+        })
       } catch {
-        if (!cancelled) setCircuitOut(null)
+        if (!cancelled) { setCircuitOut(null); setBoardSim(null) }
       }
     }, 250)
     return () => { cancelled = true; clearTimeout(handle) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawnValid, drawn, params, params2])
 
   // Two-tier: a scope/spectrum input wired through a circuit reads the .tran; otherwise the
@@ -482,6 +493,7 @@ export default function App() {
                 <Breadboard schematic={schematic} setSchematic={setSchematic} board={board} setBoard={setBoard}
                   snapshotSchematic={snapshotSchematic}
                   generators={{ w1: params, w2: params2 }}
+                  liveNodeVolts={boardSim?.nodeV ?? null} liveLedCurrents={boardSim?.ledI ?? null}
                   onLoadGenerators={(w1, w2) => { setParams({ ...DEFAULT_PARAMS, ...w1 }); setParams2({ ...DEFAULT_PARAMS2, ...w2 }) }} />
               </div>
             </div>
